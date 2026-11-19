@@ -1,6 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { shellQuote } from './shell-quote.mjs';
 
 const FILTER = resolve(dirname(fileURLToPath(import.meta.url)), 'trim-output.mjs');
 
@@ -38,7 +41,7 @@ const EXEMPT = new RegExp([
 ].join('|'), 'i');
 
 const REWRITERS = new Map([
-  ['Bash', (command) => command],
+  ['Bash', (command, filterPath) => rewriteBash(command, filterPath)],
   ['PowerShell', (command) => command],
 ]);
 
@@ -50,5 +53,17 @@ export function decide(command, toolName, filterPath = FILTER) {
   if (!existsSync(filterPath)) {
     return undefined;
   }
-  return rewrite(command);
+  return rewrite(command, filterPath);
+}
+
+// Captures to a file and then filters it, so the command runs in the current shell and keeps any
+// `cd`. It uses no shell expansion, so Claude Code can analyze it statically and asks nothing extra.
+export function rewriteBash(command, filterPath = FILTER) {
+  const capture = shellQuote(toPosix(join(tmpdir(), `claude-trim-${randomUUID().replaceAll('-', '')}.out`)));
+  const runFilter = `${shellQuote(toPosix(process.execPath))} ${shellQuote(toPosix(filterPath))} ${capture}`;
+  return `{\n${command}\n} > ${capture} 2>&1 && ${runFilter} ok || ${runFilter} failed`;
+}
+
+function toPosix(path) {
+  return path.replaceAll('\\', '/');
 }

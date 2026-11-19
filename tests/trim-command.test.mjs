@@ -1,9 +1,18 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { decide } from '../hooks/trim-command.mjs';
+import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { decide, rewriteBash } from '../hooks/trim-command.mjs';
+import { shellQuote } from '../hooks/shell-quote.mjs';
 
 const BACKSLASH = String.fromCharCode(92);
 const POWERSHELL = 'PowerShell';
+const FILTER = fileURLToPath(new URL('../hooks/trim-output.mjs', import.meta.url));
+const CAPTURE = /\}\s*>\s*('[^']*'|\S+)\s*2>&1/;
+
+const toPosix = (path) => path.replaceAll(BACKSLASH, '/');
+const captureFileOf = (rewrite) => CAPTURE.exec(rewrite)[1].replaceAll("'", '');
 
 const wrapped = (command, tool = POWERSHELL) => decide(command, tool);
 
@@ -86,5 +95,76 @@ describe('noisy commands are wrapped', () => {
 
   test('a quiet first line does not shield a noisy second', () => {
     assert.notEqual(wrapped("$env:CI = '1'\npnpm test"), undefined);
+  });
+});
+
+describe('the Bash rewrite shape', () => {
+  const result = rewriteBash('dotnet build');
+
+  test('merges stderr so failures are not lost', () => {
+    assert.ok(result.includes('2>&1'));
+  });
+
+  test('asks the shell to expand nothing Claude Code cannot analyze', () => {
+    assert.ok(!result.includes('$'));
+    assert.ok(!result.includes('`'));
+  });
+
+  test('calls the filter as a plain command an allow rule can match', () => {
+    assert.ok(result.includes(`${shellQuote(toPosix(process.execPath))} ${shellQuote(toPosix(FILTER))} `));
+  });
+
+  test('passes the capture file and the outcome to the filter on each side of && ||', () => {
+    const capture = shellQuote(toPosix(captureFileOf(result)));
+    assert.ok(result.includes(`${capture} ok || `));
+    assert.ok(result.endsWith(`${capture} failed`));
+  });
+
+  test('each rewrite captures to its own file', () => {
+    assert.notEqual(captureFileOf(rewriteBash('dotnet build')), captureFileOf(rewriteBash('dotnet build')));
+  });
+
+  test('the command is never placed in a pipeline', () => {
+    assert.ok(!result.includes('} 2>&1 |'));
+  });
+
+  test('a multi-line command is captured as a whole', () => {
+    assert.ok(rewriteBash('cd /repo\npnpm test').includes('cd /repo\npnpm test\n}'));
+  });
+
+  test('carries no PowerShell syntax', () => {
+    assert.ok(!result.includes('LASTEXITCODE'));
+  });
+});
+
+const bashIsAvailable = spawnSync('bash', ['--version']).status === 0;
+
+describe('the Bash rewrite behaves like the original command', { skip: !bashIsAvailable && 'needs bash' }, () => {
+  const runBash = (script) => spawnSync('bash', ['-c', script], { encoding: 'utf8' });
+
+  test('a succeeding command still succeeds', () => {
+    assert.equal(runBash(rewriteBash('echo fine')).status, 0);
+  });
+
+  test('a failing command still fails and keeps its output', () => {
+    const run = runBash(rewriteBash('echo broken; false'));
+    assert.notEqual(run.status, 0);
+    assert.ok(run.stdout.includes('broken'));
+  });
+
+  test('a cd inside the command carries to what follows', () => {
+    const run = runBash(`${rewriteBash('cd /')}\npwd`);
+    assert.equal(run.stdout.trim().split('\n').at(-1), '/');
+  });
+
+  test('the capture file is removed', () => {
+    const rewrite = rewriteBash('echo fine');
+    runBash(rewrite);
+    assert.equal(existsSync(captureFileOf(rewrite)), false);
+  });
+
+  test('long output comes back trimmed', () => {
+    const run = runBash(rewriteBash('seq 1 100'));
+    assert.ok(run.stdout.includes('[trim-output: 75 of 100 lines hidden;'));
   });
 });
