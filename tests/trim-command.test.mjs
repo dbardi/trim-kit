@@ -169,6 +169,54 @@ describe('the Bash rewrite behaves like the original command', { skip: !bashIsAv
   });
 });
 
+describe('wrapping is idempotent', () => {
+  for (const tool of ['Bash', POWERSHELL]) {
+    test(`an already wrapped ${tool} command is not wrapped again`, () => {
+      assert.equal(decide(wrapped('pnpm test', tool), tool), undefined);
+    });
+  }
+
+  test('a command that already pipes through the filter is left alone', () => {
+    assert.equal(wrapped('pnpm test | node hooks/trim-output.mjs', 'Bash'), undefined);
+  });
+});
+
+describe('the hook protocol', () => {
+  const HOOK = fileURLToPath(new URL('../hooks/trim-command.mjs', import.meta.url));
+
+  const runHook = (stdin) => {
+    const run = spawnSync(process.execPath, [HOOK], { input: stdin, encoding: 'utf8' });
+    return { status: run.status, output: JSON.parse(run.stdout) };
+  };
+  const payload = (toolInput, toolName = POWERSHELL) => JSON.stringify({ tool_name: toolName, tool_input: toolInput });
+
+  test('an untouched command emits an empty object', () => {
+    assert.deepEqual(runHook(payload({ command: 'echo hi' })).output, {});
+  });
+
+  test('a wrapped command emits updated input for PreToolUse', () => {
+    const { hookSpecificOutput } = runHook(payload({ command: 'pnpm test' })).output;
+    assert.equal(hookSpecificOutput.hookEventName, 'PreToolUse');
+    assert.ok(hookSpecificOutput.updatedInput.command.includes('Out-String'));
+  });
+
+  test('other tool input fields survive the rewrite', () => {
+    const { updatedInput } = runHook(payload({ command: 'pnpm test', description: 'run tests', timeout: 600000 })).output.hookSpecificOutput;
+    assert.equal(updatedInput.description, 'run tests');
+    assert.equal(updatedInput.timeout, 600000);
+  });
+
+  test('a payload with no tool input emits an empty object', () => {
+    assert.deepEqual(runHook(JSON.stringify({ tool_name: POWERSHELL })).output, {});
+  });
+
+  test('malformed stdin does not take the tool call down', () => {
+    const { status, output } = runHook('not json at all');
+    assert.equal(status, 0);
+    assert.deepEqual(output, {});
+  });
+});
+
 describe('each shell gets its own syntax', () => {
   test('PowerShell gets the Out-String capture', () => {
     assert.ok(decide('pnpm test', 'PowerShell').includes('Out-String'));

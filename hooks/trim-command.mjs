@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { shellQuote } from './shell-quote.mjs';
 
-const FILTER = resolve(dirname(fileURLToPath(import.meta.url)), 'trim-output.mjs');
+const FILTER_NAME = 'trim-output.mjs';
+const FILTER = resolve(dirname(fileURLToPath(import.meta.url)), FILTER_NAME);
 
 // Matched at the start of any line, or after a statement separator, so "cd foo; pnpm test" is caught.
 const NOISY = new RegExp(
@@ -47,7 +48,7 @@ const REWRITERS = new Map([
 
 export function decide(command, toolName, filterPath = FILTER) {
   const rewrite = REWRITERS.get(toolName);
-  if (!rewrite || !command || EXEMPT.test(command) || !NOISY.test(command)) {
+  if (!rewrite || !command || command.includes(FILTER_NAME) || EXEMPT.test(command) || !NOISY.test(command)) {
     return undefined;
   }
   if (!existsSync(filterPath)) {
@@ -77,4 +78,29 @@ export function rewritePowerShell(command, filterPath = FILTER) {
 
 function toPosix(path) {
   return path.replaceAll('\\', '/');
+}
+
+// Reads a PreToolUse payload from stdin and prints "{}" or the same tool input with the command rewritten.
+function main() {
+  const payload = parsePayload(readFileSync(0, 'utf8'));
+  const toolInput = payload.tool_input ?? {};
+  const rewritten = decide(toolInput.command, payload.tool_name);
+  if (rewritten === undefined) {
+    process.stdout.write('{}');
+    return;
+  }
+  const updatedInput = { ...toolInput, command: rewritten };
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput } }));
+}
+
+function parsePayload(text) {
+  try {
+    return JSON.parse(text) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
 }
