@@ -19,6 +19,49 @@ describe('short output is left alone', () => {
   });
 });
 
+const numberedLines = (filler, count) => Array.from({ length: count }, (_, i) => `${filler} ${i}`);
+
+describe('long output is trimmed to its summary', () => {
+  const result = trimmed(numberedLines('step', 100).join('\n'));
+
+  test('a note says how many lines were hidden', () => {
+    assert.ok(result.includes('[trim-output: 75 of 100 lines hidden; re-run without the pipe for full output]'));
+  });
+
+  test('the final 25 lines survive', () => {
+    assert.ok(result.includes('step 75\n'));
+    assert.ok(result.includes('step 99\n'));
+  });
+
+  test('the bulk of the middle is gone', () => {
+    assert.ok(!result.includes('step 74\n'));
+    assert.ok(!result.includes('step 40\n'));
+  });
+});
+
+describe('the trimming threshold', () => {
+  test('exactly 60 lines are left alone', () => {
+    assert.ok(!trimmed(numberedLines('step', 60).join('\n')).includes(TRIM_NOTE));
+  });
+
+  test('61 lines are trimmed', () => {
+    assert.ok(trimmed(numberedLines('step', 61).join('\n')).includes(TRIM_NOTE));
+  });
+});
+
+describe('successful steps are dropped when trimming', () => {
+  const mixed = numberedLines('step', 100).map((line, i) => (i % 2 === 0 ? `PASS suite ${i}` : line));
+  const result = trimmed(mixed.join('\n'));
+
+  test('no passing line survives', () => {
+    assert.ok(!result.includes('PASS'));
+  });
+
+  test('the final lines that remain survive', () => {
+    assert.ok(result.includes('step 99\n'));
+  });
+});
+
 describe('noise is dropped', () => {
   const survives = (line) => trimmed(`keep me\n${line}\nkeep me too`).includes(line);
 

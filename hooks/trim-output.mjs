@@ -12,8 +12,29 @@ const NOISE = new RegExp([
   String.raw`^\s*$`,
 ].join('|'));
 
+const PASSING = new RegExp([
+  String.raw`^\s*PASS\b`,
+  String.raw`^\s*[✓✔]`,
+  String.raw`^\s*ok\s+\d+`,
+  String.raw`^\s*Done\s+in\s`,
+].join('|'));
+
+const KEEP_ALL_UNDER = 60;
+const TAIL_LINES = 25;
+
 export function trimmed(raw) {
   const lines = clean(raw);
+  if (lines.length <= KEEP_ALL_UNDER) {
+    return withNewlines(lines);
+  }
+  const original = lines.length;
+  const withoutPasses = lines.filter((line) => !PASSING.test(line));
+  const kept = withoutPasses.slice(-TAIL_LINES);
+  const note = `[trim-output: ${original - kept.length} of ${original} lines hidden; re-run without the pipe for full output]`;
+  return withNewlines([...kept, note]);
+}
+
+function withNewlines(lines) {
   return lines.map((line) => `${line}\n`).join('');
 }
 
