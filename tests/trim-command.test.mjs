@@ -7,6 +7,26 @@ const POWERSHELL = 'PowerShell';
 
 const wrapped = (command, tool = POWERSHELL) => decide(command, tool);
 
+describe('quiet commands are untouched', () => {
+  for (const command of ['Get-ChildItem', 'git status', 'echo hi', 'Test-Path foo', 'node --eval 1']) {
+    test(command, () => {
+      assert.equal(wrapped(command), undefined);
+    });
+  }
+
+  test('an empty command', () => {
+    assert.equal(wrapped(''), undefined);
+  });
+});
+
+describe('only the shell tools are this hook\'s business', () => {
+  for (const tool of ['Write', 'Read', 'Glob', '', 'constructor', 'toString']) {
+    test(`not ${tool || 'an empty tool name'}`, () => {
+      assert.equal(wrapped('pnpm test', tool), undefined);
+    });
+  }
+});
+
 describe('noisy commands are wrapped', () => {
   const packageManagersAndCompilers = [
     'pnpm install', 'pnpm test', 'pnpm build', 'npm ci', 'yarn build', 'dotnet build', 'dotnet test',
