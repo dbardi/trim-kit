@@ -246,8 +246,8 @@ describe('the PowerShell rewrite shape', () => {
     assert.ok(result.includes('$c = $LASTEXITCODE'));
   });
 
-  test('re-raises the exit code, using 0 when nothing native ran', () => {
-    assert.ok(result.endsWith('exit $(if ($null -eq $c) { 0 } else { $c })'));
+  test('re-raises the native exit code, else 1 after an error, else 0', () => {
+    assert.ok(result.endsWith('exit $(if ($null -ne $c) { $c } elseif ($f) { 1 } else { 0 })'));
   });
 
   test('stays within Windows PowerShell 5.1 syntax', () => {
@@ -293,6 +293,21 @@ describe('the PowerShell rewrite behaves like the original command', { skip: !po
   test('long output comes back trimmed', () => {
     const run = runPowerShell(rewritePowerShell('1..100 | ForEach-Object { "line $_" }'));
     assert.ok(run.stdout.includes('[trim-output: 75 of 100 lines hidden;'));
+  });
+
+  test('an unknown command fails when no native command ran', () => {
+    const run = runPowerShell(rewritePowerShell('No-Such-Command-Anywhere'));
+    assert.notEqual(run.status, 0);
+  });
+
+  test('a cmdlet error fails when no native command ran', () => {
+    const run = runPowerShell(rewritePowerShell('Get-Item "C:/no/such/path/anywhere"'));
+    assert.notEqual(run.status, 0);
+  });
+
+  test('a native command that succeeds stays successful after an earlier handled error', () => {
+    const run = runPowerShell(rewritePowerShell('Get-Item "C:/no/such/path" -ErrorAction SilentlyContinue; cmd /c "echo ok"'));
+    assert.equal(run.status, 0);
   });
 
   test('a trailing comment does not swallow the closing brace', () => {
