@@ -37,7 +37,7 @@ describe('long output is trimmed to its summary', () => {
   const result = trimmed(numberedLines('step', 100).join('\n'));
 
   test('a note says how many lines were hidden', () => {
-    assert.ok(result.includes('[trim-output: 75 of 100 lines hidden; re-run without the pipe for full output]'));
+    assert.ok(result.includes('[trim-output: 75 of 100 lines hidden; re-run with its output redirected to a file for full output]'));
   });
 
   test('the final 25 lines survive', () => {
@@ -132,7 +132,7 @@ describe('promoted lines are capped', () => {
   });
 
   test('the note says how many were capped', () => {
-    assert.ok(result.includes('; 65 further matches capped; re-run without the pipe for full output]'));
+    assert.ok(result.includes('; 65 further matches capped; re-run with its output redirected to a file for full output]'));
   });
 });
 

@@ -85,7 +85,7 @@ function withGapMarkers(lines, keptIndexes) {
 
 function hiddenNote(hidden, original, capped) {
   const cappedNote = capped ? `; ${capped} further matches capped` : '';
-  return `[trim-output: ${hidden} of ${original} lines hidden${cappedNote}; re-run without the pipe for full output]`;
+  return `[trim-output: ${hidden} of ${original} lines hidden${cappedNote}; re-run with its output redirected to a file for full output]`;
 }
 
 function withNewlines(lines) {
