@@ -48,7 +48,7 @@ In Claude Code, run these two commands:
 Then start a new session, or run `/reload-plugins`.
 
 To use the output style, run `/config`, open **Output style**, and choose
-**Clear Concise Actionable**. The trimming, the model check and the agent work
+**trim-kit:Clear Concise Actionable**. The trimming, the model check and the agent work
 without this step.
 
 ## What gets trimmed
