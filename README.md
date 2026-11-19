@@ -41,7 +41,7 @@ The failure list, the root cause and the `Tests:` summary all survived.
 In Claude Code, run these two commands:
 
 ```
-/plugin marketplace add dbardi/claude-trim
+/plugin marketplace add dbardi/trim-kit
 /plugin install trim-kit@trim-kit
 ```
 
@@ -75,8 +75,11 @@ passing test lines, and stack frames inside `node_modules`. Short output, up to
 Every trim ends with a note, so nothing disappears silently:
 
 ```
-[trim-output: 113 of 138 lines hidden; re-run without the pipe for full output]
+[trim-output: 113 of 138 lines hidden; re-run with its output redirected to a file for full output]
 ```
+
+A command that redirects its output to a file, such as `pnpm test > test.log`,
+is left alone, so that is how you get every line.
 
 ## What is left alone
 
@@ -115,22 +118,35 @@ new command through `hookSpecificOutput.updatedInput`. On Bash:
 ```
 
 `<capture>` is a file in the system temp directory with a fresh name for every
-rewrite. On PowerShell, which needs Windows PowerShell 5.1 or newer:
+rewrite. On PowerShell, which needs Windows PowerShell 5.1 or newer, written
+here on separate lines for reading:
 
 ```powershell
-$o = & { <your command> } 2>&1 | Out-String -Stream; $c = $LASTEXITCODE; if (Test-Path "<filter>") { $o | & "<node>" "<filter>" } else { $o }; exit $(if ($null -eq $c) { 0 } else { $c })
+$OutputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+$e = if ($Error.Count -gt 0) { $Error[0] }
+$o = & {
+<your command>
+} 2>&1 | Out-String -Stream
+$c = $LASTEXITCODE
+$f = $Error.Count -gt 0 -and -not [object]::ReferenceEquals($Error[0], $e)
+if (Test-Path "<filter>") { $o | & "<node>" "<filter>" } else { $o }
+exit $(if ($null -ne $c) { $c } elseif ($f) { 1 } else { 0 })
 ```
 
 Details that matter in both:
 
-- **Neither shell filters in a pipeline.** PowerShell has no `set -o
-  pipefail`, so a pipeline would report the filter's exit code and a failed
-  build would look successful. Bash runs every stage of a pipeline in a
-  subshell, so a pipeline would discard any `cd` the command made, and Claude
-  Code's Bash tool carries the working directory between calls.
-- **A brace group** captures a multi-line command whole and runs in the current
-  shell, which keeps a `cd`. A command that calls `exit` itself ends the shell
-  before the filter sees its output.
+- **The command runs to completion before the filter starts.** PowerShell has
+  no `set -o pipefail`, so the capture keeps the command's own exit code
+  instead of the filter's.
+- **The command sits on its own lines** inside the group, so a trailing `#`
+  comment cannot swallow the closing brace. The group runs in the current shell,
+  which keeps a `cd`, and Claude Code's Bash tool carries the working directory
+  between calls. A command that calls `exit` itself ends the shell before the
+  filter sees its output.
+- **PowerShell passes UTF-8 to the filter.** Windows PowerShell 5.1 encodes
+  what it pipes to a program as ASCII, which turns cross marks into `?`.
+- **PowerShell exits with the command's native exit code.** When no native
+  command ran, it exits 1 if the command raised an error, and 0 otherwise.
 - **The Bash rewrite asks the shell to expand nothing.** Claude Code asks
   before running a command it cannot analyze, and `$(mktemp)` or `$?` is exactly
   that. The hook names the capture file, the filter learns the outcome from
@@ -171,8 +187,8 @@ The thresholds are at the top of `hooks/trim-output.mjs`:
 node --test
 ```
 
-184 tests with no dependencies beyond Node.js. The rewrites also run in a real
-Bash and a real Windows PowerShell where those are installed.
+The tests need nothing beyond Node.js. The rewrites also run in a real Bash and
+a real Windows PowerShell where those are installed.
 
 | Area | Covers |
 | --- | --- |

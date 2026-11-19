@@ -26,6 +26,7 @@ function parsePayload(text) {
   try {
     return JSON.parse(text);
   } catch {
+    // A hook must never break the session, so unreadable input allows the launch.
     return undefined;
   }
 }
