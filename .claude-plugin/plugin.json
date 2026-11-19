@@ -1,5 +1,5 @@
 {
-  "name": "claude-trim",
+  "name": "trim-kit",
   "version": "1.0.0",
   "description": "Saves tokens in Claude Code by trimming noisy command output, requiring a model on every subagent launch, and adding a concise output style and a repo-search agent.",
   "author": {

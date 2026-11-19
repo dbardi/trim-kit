@@ -1,4 +1,4 @@
-# claude-trim
+# trim-kit
 
 A Claude Code plugin that saves tokens, so your sessions last longer and cost less.
 
@@ -27,7 +27,7 @@ The failure list, the root cause and the `Tests:` summary all survived.
   important information last, no flattery or filler.
 - **The `repo-search` agent.** A cheap, read-only helper that finds where
   things are in a codebase, so the main conversation does not fill up with
-  search results. Claude Code lists it as `claude-trim:repo-search`.
+  search results. Claude Code lists it as `trim-kit:repo-search`.
 
 ## What you need
 
@@ -42,7 +42,7 @@ In Claude Code, run these two commands:
 
 ```
 /plugin marketplace add dbardi/claude-trim
-/plugin install claude-trim@claude-trim
+/plugin install trim-kit@trim-kit
 ```
 
 Then start a new session, or run `/reload-plugins`.
@@ -88,8 +88,8 @@ Every trim ends with a note, so nothing disappears silently:
 ## Uninstall
 
 ```
-/plugin uninstall claude-trim@claude-trim
-/plugin marketplace remove claude-trim
+/plugin uninstall trim-kit@trim-kit
+/plugin marketplace remove trim-kit
 ```
 
 ## Coming from version 0.2

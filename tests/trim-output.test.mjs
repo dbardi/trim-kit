@@ -237,7 +237,7 @@ describe('the command line, reading a capture file', () => {
   let capture;
 
   beforeEach(() => {
-    directory = mkdtempSync(join(tmpdir(), 'claude-trim-test-'));
+    directory = mkdtempSync(join(tmpdir(), 'trim-kit-test-'));
     capture = join(directory, 'capture.out');
     writeFileSync(capture, 'one\ntwo', 'utf8');
   });
