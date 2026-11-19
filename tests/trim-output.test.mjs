@@ -1,6 +1,18 @@
-import { test, describe } from 'node:test';
+import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { trimmed } from '../hooks/trim-output.mjs';
+
+const FILTER = fileURLToPath(new URL('../hooks/trim-output.mjs', import.meta.url));
+
+function runFilter({ args = [], stdin = '' }) {
+  const run = spawnSync(process.execPath, [FILTER, ...args], { input: stdin, encoding: 'utf8' });
+  return { stdout: run.stdout, status: run.status };
+}
 
 const TRIM_NOTE = '[trim-output:';
 const BACKSLASH = String.fromCharCode(92);
@@ -199,5 +211,61 @@ describe('terminal control characters', () => {
 
   test('characters the Windows console cannot encode survive', () => {
     assert.ok(trimmed('  ● Test suite failed to run').includes('●'));
+  });
+});
+
+describe('the command line, reading standard input', () => {
+  test('filters the piped output', () => {
+    const { stdout, status } = runFilter({ stdin: 'one\n\ntwo' });
+    assert.equal(stdout, 'one\ntwo\n');
+    assert.equal(status, 0);
+  });
+
+  test('writes characters the console codepage cannot encode as UTF-8', () => {
+    assert.equal(runFilter({ stdin: '  ● Test suite failed to run' }).stdout, '  ● Test suite failed to run\n');
+  });
+
+  test('replaces bytes that are not UTF-8 rather than failing', () => {
+    const run = spawnSync(process.execPath, [FILTER], { input: Buffer.from([0x61, 0xff, 0x62]) });
+    assert.equal(run.status, 0);
+    assert.equal(run.stdout.toString('utf8'), 'a�b\n');
+  });
+});
+
+describe('the command line, reading a capture file', () => {
+  let directory;
+  let capture;
+
+  beforeEach(() => {
+    directory = mkdtempSync(join(tmpdir(), 'claude-trim-test-'));
+    capture = join(directory, 'capture.out');
+    writeFileSync(capture, 'one\ntwo', 'utf8');
+  });
+
+  afterEach(() => rmSync(directory, { recursive: true, force: true }));
+
+  test('the output is read from the file', () => {
+    assert.equal(runFilter({ args: [capture, 'ok'] }).stdout, 'one\ntwo\n');
+  });
+
+  test('the file is removed once read', () => {
+    runFilter({ args: [capture, 'ok'] });
+    assert.equal(existsSync(capture), false);
+  });
+
+  test('a command that succeeded exits cleanly', () => {
+    assert.equal(runFilter({ args: [capture, 'ok'] }).status, 0);
+  });
+
+  test('a command that failed is reported as a failure', () => {
+    assert.equal(runFilter({ args: [capture, 'failed'] }).status, 1);
+  });
+
+  test('a failed command still shows its output', () => {
+    assert.equal(runFilter({ args: [capture, 'failed'] }).stdout, 'one\ntwo\n');
+  });
+
+  test('a missing capture file is reported as a failure', () => {
+    assert.equal(runFilter({ args: [join(directory, 'absent.out'), 'ok'] }).status, 1);
   });
 });
