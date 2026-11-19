@@ -42,7 +42,7 @@ const EXEMPT = new RegExp([
 
 const REWRITERS = new Map([
   ['Bash', (command, filterPath) => rewriteBash(command, filterPath)],
-  ['PowerShell', (command) => command],
+  ['PowerShell', (command, filterPath) => rewritePowerShell(command, filterPath)],
 ]);
 
 export function decide(command, toolName, filterPath = FILTER) {
@@ -62,6 +62,17 @@ export function rewriteBash(command, filterPath = FILTER) {
   const capture = shellQuote(toPosix(join(tmpdir(), `claude-trim-${randomUUID().replaceAll('-', '')}.out`)));
   const runFilter = `${shellQuote(toPosix(process.execPath))} ${shellQuote(toPosix(filterPath))} ${capture}`;
   return `{\n${command}\n} > ${capture} 2>&1 && ${runFilter} ok || ${runFilter} failed`;
+}
+
+// PowerShell has no pipefail, so it captures first, keeps $LASTEXITCODE and re-raises it after the filter.
+// It uses only Windows PowerShell 5.1 syntax, and shows the raw output when the filter file is missing.
+export function rewritePowerShell(command, filterPath = FILTER) {
+  const interpreter = `"${toPosix(process.execPath)}"`;
+  const filter = `"${toPosix(filterPath)}"`;
+  return `$o = & { ${command} } 2>&1 | Out-String -Stream; `
+    + '$c = $LASTEXITCODE; '
+    + `if (Test-Path ${filter}) { $o | & ${interpreter} ${filter} } else { $o }; `
+    + 'exit $(if ($null -eq $c) { 0 } else { $c })';
 }
 
 function toPosix(path) {

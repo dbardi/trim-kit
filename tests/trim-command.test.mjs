@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { decide, rewriteBash } from '../hooks/trim-command.mjs';
+import { decide, rewriteBash, rewritePowerShell } from '../hooks/trim-command.mjs';
 import { shellQuote } from '../hooks/shell-quote.mjs';
 
 const BACKSLASH = String.fromCharCode(92);
@@ -165,6 +165,85 @@ describe('the Bash rewrite behaves like the original command', { skip: !bashIsAv
 
   test('long output comes back trimmed', () => {
     const run = runBash(rewriteBash('seq 1 100'));
+    assert.ok(run.stdout.includes('[trim-output: 75 of 100 lines hidden;'));
+  });
+});
+
+describe('each shell gets its own syntax', () => {
+  test('PowerShell gets the Out-String capture', () => {
+    assert.ok(decide('pnpm test', 'PowerShell').includes('Out-String'));
+  });
+
+  test('Bash gets the brace group redirect', () => {
+    assert.match(decide('pnpm test', 'Bash'), CAPTURE);
+  });
+
+  test('the Bash syntax does not leak into PowerShell', () => {
+    assert.doesNotMatch(decide('pnpm test', 'PowerShell'), CAPTURE);
+  });
+});
+
+describe('the PowerShell rewrite shape', () => {
+  const result = rewritePowerShell('dotnet build');
+
+  test('captures before filtering because a pipeline would report the filter\'s exit code', () => {
+    assert.ok(result.startsWith('$o = & { dotnet build } 2>&1 | Out-String -Stream; '));
+  });
+
+  test('merges stderr so failures are not lost', () => {
+    assert.ok(result.includes('2>&1'));
+  });
+
+  test('captures the exit code before the filter overwrites it', () => {
+    assert.ok(result.includes('$c = $LASTEXITCODE'));
+  });
+
+  test('re-raises the exit code, using 0 when nothing native ran', () => {
+    assert.ok(result.endsWith('exit $(if ($null -eq $c) { 0 } else { $c })'));
+  });
+
+  test('stays within Windows PowerShell 5.1 syntax', () => {
+    assert.ok(!result.includes('??'));
+  });
+
+  test('degrades to raw output when the filter is missing', () => {
+    assert.ok(result.includes('if (Test-Path '));
+    assert.ok(result.includes('else { $o }'));
+  });
+
+  test('invokes the interpreter running this hook, not a bare node', () => {
+    assert.ok(result.includes(`& "${toPosix(process.execPath)}" "${toPosix(FILTER)}"`));
+  });
+
+  test('carries no backslash paths', () => {
+    assert.ok(!result.includes(BACKSLASH));
+  });
+
+  test('carries no Bash syntax', () => {
+    assert.doesNotMatch(result, CAPTURE);
+  });
+});
+
+const powershellIsAvailable = spawnSync('powershell.exe', ['-NoProfile', '-Command', 'exit 0']).status === 0;
+
+describe('the PowerShell rewrite behaves like the original command', { skip: !powershellIsAvailable && 'needs powershell.exe' }, () => {
+  const runPowerShell = (script) => {
+    const encoded = Buffer.from(script, 'utf16le').toString('base64');
+    return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], { encoding: 'utf8' });
+  };
+
+  test('a succeeding command still succeeds', () => {
+    assert.equal(runPowerShell(rewritePowerShell('Write-Output fine')).status, 0);
+  });
+
+  test('a failing native command keeps its exit code and its output', () => {
+    const run = runPowerShell(rewritePowerShell('cmd /c "echo broken & exit 3"'));
+    assert.equal(run.status, 3);
+    assert.ok(run.stdout.includes('broken'));
+  });
+
+  test('long output comes back trimmed', () => {
+    const run = runPowerShell(rewritePowerShell('1..100 | ForEach-Object { "line $_" }'));
     assert.ok(run.stdout.includes('[trim-output: 75 of 100 lines hidden;'));
   });
 });
