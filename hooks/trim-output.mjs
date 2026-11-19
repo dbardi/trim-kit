@@ -1,4 +1,7 @@
-const ANSI = /\x1B\[[0-?]*[ -/]*[@-~]|\x1B\][^\x07]*\x07/g;
+import { readFileSync, unlinkSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const ANSI =/\x1B\[[0-?]*[ -/]*[@-~]|\x1B\][^\x07]*\x07/g;
 
 const NOISE = new RegExp([
   String.raw`^\s*Progress:\s*resolved\s`, // pnpm resolver ticker
@@ -95,4 +98,23 @@ function clean(raw) {
     .split('\n')
     .map((line) => line.replace(ANSI, '').trimEnd().split('\r').at(-1))
     .filter((line) => !NOISE.test(line));
+}
+
+// Filters stdin, or the capture file named by `[path, "ok" | "failed"]`, which it deletes.
+export function main(args) {
+  if (args.length === 0) {
+    process.stdout.write(trimmed(readFileSync(0, 'utf8')));
+    return;
+  }
+  const [capturePath, outcome] = args;
+  const raw = readFileSync(capturePath, 'utf8');
+  unlinkSync(capturePath);
+  process.stdout.write(trimmed(raw));
+  if (outcome !== 'ok') {
+    process.exitCode = 1;
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main(process.argv.slice(2));
 }
