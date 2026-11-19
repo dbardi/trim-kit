@@ -27,7 +27,7 @@ const NOISY = new RegExp(
   'im',
 );
 
-// Commands the pipe would break, or whose output is the point.
+// Commands whose output is the point, that never finish, or that already write to a file.
 const EXEMPT = new RegExp([
   '--help',
   String.raw`-h\b`,
@@ -42,8 +42,8 @@ const EXEMPT = new RegExp([
 ].join('|'), 'i');
 
 const REWRITERS = new Map([
-  ['Bash', (command, filterPath) => rewriteBash(command, filterPath)],
-  ['PowerShell', (command, filterPath) => rewritePowerShell(command, filterPath)],
+  ['Bash', rewriteBash],
+  ['PowerShell', rewritePowerShell],
 ]);
 
 export function decide(command, toolName, filterPath = FILTER) {
@@ -101,6 +101,7 @@ function parsePayload(text) {
   try {
     return JSON.parse(text) ?? {};
   } catch {
+    // A hook must never break the session, so unreadable input means no rewrite.
     return {};
   }
 }
