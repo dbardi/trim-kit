@@ -235,7 +235,7 @@ describe('the PowerShell rewrite shape', () => {
   const result = rewritePowerShell('dotnet build');
 
   test('captures before filtering because a pipeline would report the filter\'s exit code', () => {
-    assert.ok(result.startsWith('$o = & { dotnet build } 2>&1 | Out-String -Stream; '));
+    assert.ok(result.includes('$o = & { dotnet build } 2>&1 | Out-String -Stream; '));
   });
 
   test('merges stderr so failures are not lost', () => {
@@ -293,5 +293,12 @@ describe('the PowerShell rewrite behaves like the original command', { skip: !po
   test('long output comes back trimmed', () => {
     const run = runPowerShell(rewritePowerShell('1..100 | ForEach-Object { "line $_" }'));
     assert.ok(run.stdout.includes('[trim-output: 75 of 100 lines hidden;'));
+  });
+
+  test('a cross mark on its own buried in long output survives the trim', () => {
+    const buried = '1..50 | ForEach-Object { "step $_" }; Write-Output ([string][char]0x2715 + " adds numbers"); '
+      + '1..50 | ForEach-Object { "tail $_" }';
+    const run = runPowerShell(rewritePowerShell(buried));
+    assert.ok(run.stdout.includes('✕ adds numbers'));
   });
 });

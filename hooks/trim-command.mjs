@@ -70,7 +70,8 @@ export function rewriteBash(command, filterPath = FILTER) {
 export function rewritePowerShell(command, filterPath = FILTER) {
   const interpreter = `"${toPosix(process.execPath)}"`;
   const filter = `"${toPosix(filterPath)}"`;
-  return `$o = & { ${command} } 2>&1 | Out-String -Stream; `
+  return '$OutputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; '
+    + `$o = & { ${command} } 2>&1 | Out-String -Stream; `
     + '$c = $LASTEXITCODE; '
     + `if (Test-Path ${filter}) { $o | & ${interpreter} ${filter} } else { $o }; `
     + 'exit $(if ($null -eq $c) { 0 } else { $c })';
