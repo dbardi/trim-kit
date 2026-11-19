@@ -1,0 +1,27 @@
+{
+  "description": "Trims noisy command output and requires a model on every subagent launch",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v node >/dev/null 2>&1 || exit 0; node \"${CLAUDE_PLUGIN_ROOT}/hooks/trim-command.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v node >/dev/null 2>&1 || exit 0; node \"${CLAUDE_PLUGIN_ROOT}/hooks/require-subagent-model.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
