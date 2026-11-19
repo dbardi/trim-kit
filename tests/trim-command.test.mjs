@@ -27,6 +27,30 @@ describe('only the shell tools are this hook\'s business', () => {
   }
 });
 
+describe('exemptions are honored', () => {
+  const informational = ['dotnet build --version', 'jest --help', 'tsc -v', 'playwright test --list'];
+  for (const command of informational) {
+    test(`output that is the answer: ${command}`, () => {
+      assert.equal(wrapped(command), undefined);
+    });
+  }
+
+  const neverTerminating = ['jest --watch', 'vitest --watchAll', 'npm run dev', 'npm run start', 'npm run serve'];
+  for (const command of neverTerminating) {
+    test(`watch modes and servers: ${command}`, () => {
+      assert.equal(wrapped(command), undefined);
+    });
+  }
+
+  test('a command already redirecting to a file', () => {
+    assert.equal(wrapped('pnpm build > build.log'), undefined);
+  });
+
+  test('a missing filter leaves the command untouched', () => {
+    assert.equal(decide('pnpm test', 'Bash', '/nonexistent/trim-output.mjs'), undefined);
+  });
+});
+
 describe('noisy commands are wrapped', () => {
   const packageManagersAndCompilers = [
     'pnpm install', 'pnpm test', 'pnpm build', 'npm ci', 'yarn build', 'dotnet build', 'dotnet test',
