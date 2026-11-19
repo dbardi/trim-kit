@@ -39,6 +39,91 @@ describe('long output is trimmed to its summary', () => {
   });
 });
 
+const buriedIn100Lines = (line) => {
+  const lines = numberedLines('step', 100);
+  lines[40] = line;
+  return trimmed(lines.join('\n'));
+};
+
+describe('an error buried in the middle is promoted', () => {
+  const result = buriedIn100Lines('ERROR: the root cause');
+
+  test('the error line survives', () => {
+    assert.ok(result.includes('ERROR: the root cause\n'));
+  });
+
+  test('a gap marker counts the lines cut before the summary', () => {
+    assert.ok(result.includes('    ... 34 lines omitted ...\n'));
+  });
+
+  test('no marker precedes the first kept line', () => {
+    assert.ok(result.startsWith('ERROR: the root cause\n'));
+  });
+
+  test('the hidden count excludes the promoted line', () => {
+    assert.ok(result.includes('[trim-output: 74 of 100 lines hidden;'));
+  });
+});
+
+describe('lines worth keeping wherever they appear', () => {
+  const signals = [
+    'npm ERR! code ELIFECYCLE',
+    'npm ERR! missing script: build',
+    'FAIL  src/a.test.ts',
+    'Unhandled exception in worker',
+    'Traceback (most recent call last):',
+    'warning: unused variable',
+    'WARN deprecated package',
+    'Cannot find module foo',
+    'module not found',
+    'x is undefined',
+    'ENOENT: no such file',
+    'EADDRINUSE: port 3000',
+    'src/a.ts(3,9): error TS2322: not assignable',
+    '  Expected: 1',
+    '- Received: 2',
+    '  ● Test suite failed to run',
+    '  ✕ adds numbers',
+    'Tests:       3 failed, 8 passed',
+    'Test Suites: 1 failed',
+    'Snapshots:   0 total',
+  ];
+
+  for (const line of signals) {
+    test(`keeps ${line.trim()}`, () => {
+      assert.ok(buriedIn100Lines(line).includes(`${line}\n`));
+    });
+  }
+
+  test('does not keep an ordinary line', () => {
+    assert.ok(!buriedIn100Lines('compiling module 40').includes('compiling module 40'));
+  });
+});
+
+describe('a wall of passes collapses to the failure', () => {
+  test('the failing suite survives and the passing ones do not', () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `PASS  suite ${i}`);
+    lines[4] = 'FAIL  suite 4';
+    const result = trimmed(lines.join('\n'));
+    assert.ok(result.includes('FAIL  suite 4\n'));
+    assert.ok(!result.includes('PASS  suite 99'));
+  });
+});
+
+describe('promoted lines are capped', () => {
+  const lines = [...numberedLines('error', 150), ...numberedLines('step', 20)];
+  const result = trimmed(lines.join('\n'));
+
+  test('only the first 80 survive', () => {
+    assert.ok(result.includes('error 79\n'));
+    assert.ok(!result.includes('error 80\n'));
+  });
+
+  test('the note says how many were capped', () => {
+    assert.ok(result.includes('; 65 further matches capped; re-run without the pipe for full output]'));
+  });
+});
+
 describe('the trimming threshold', () => {
   test('exactly 60 lines are left alone', () => {
     assert.ok(!trimmed(numberedLines('step', 60).join('\n')).includes(TRIM_NOTE));
