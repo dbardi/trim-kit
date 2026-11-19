@@ -1,12 +1,12 @@
 {
-  "name": "claude-trim",
+  "name": "trim-kit",
   "description": "Token-saving tools for Claude Code",
   "owner": {
     "name": "dbardi"
   },
   "plugins": [
     {
-      "name": "claude-trim",
+      "name": "trim-kit",
       "description": "Trims noisy command output, requires a model on every subagent launch, and adds a concise output style and a repo-search agent.",
       "source": "./"
     }

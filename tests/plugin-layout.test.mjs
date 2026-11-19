@@ -18,8 +18,8 @@ const frontmatterOf = (relative) => {
 describe('the plugin manifest', () => {
   const manifest = readJson('.claude-plugin/plugin.json');
 
-  test('is named claude-trim', () => {
-    assert.equal(manifest.name, 'claude-trim');
+  test('is named trim-kit', () => {
+    assert.equal(manifest.name, 'trim-kit');
   });
 
   test('has a semantic version', () => {
@@ -40,7 +40,7 @@ describe('the marketplace', () => {
   const manifest = readJson('.claude-plugin/plugin.json');
 
   test('has a name and an owner', () => {
-    assert.equal(marketplace.name, 'claude-trim');
+    assert.equal(marketplace.name, 'trim-kit');
     assert.equal(marketplace.owner.name, 'dbardi');
   });
 

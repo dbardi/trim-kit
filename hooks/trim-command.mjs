@@ -60,7 +60,7 @@ export function decide(command, toolName, filterPath = FILTER) {
 // Captures to a file and then filters it, so the command runs in the current shell and keeps any
 // `cd`. It uses no shell expansion, so Claude Code can analyze it statically and asks nothing extra.
 export function rewriteBash(command, filterPath = FILTER) {
-  const capture = shellQuote(toPosix(join(tmpdir(), `claude-trim-${randomUUID().replaceAll('-', '')}.out`)));
+  const capture = shellQuote(toPosix(join(tmpdir(), `trim-kit-${randomUUID().replaceAll('-', '')}.out`)));
   const runFilter = `${shellQuote(toPosix(process.execPath))} ${shellQuote(toPosix(filterPath))} ${capture}`;
   return `{\n${command}\n} > ${capture} 2>&1 && ${runFilter} ok || ${runFilter} failed`;
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { shellQuote } from '../hooks/shell-quote.mjs';
 
 test('leaves a plain path untouched', () => {
-  assert.equal(shellQuote('/tmp/claude-trim-1.out'), '/tmp/claude-trim-1.out');
+  assert.equal(shellQuote('/tmp/trim-kit-1.out'), '/tmp/trim-kit-1.out');
 });
 
 test('leaves a Windows drive path with forward slashes untouched', () => {
