@@ -55,22 +55,34 @@ without this step.
 
 Package managers, build tools and test runners:
 
-- `pnpm install`, `i`, `add`, `update`, `build`, `test`, `lint` and `typecheck`
+- `pnpm install`, `i`, `add`, `update`, `build`, `test`, `lint`, `typecheck`
+  and `run`
 - `npm install`, `ci`, `test`, `run` and `rebuild`
-- `yarn install`, `add`, `build`, `test` and `lint`
+- `yarn` on its own, and `yarn install`, `add`, `build`, `test`, `lint` and `run`
 - `dotnet build`, `test`, `restore`, `publish` and `pack`, and `msbuild`
-- `jest`, `tsc`, `eslint`, `vitest` and `playwright`, by name or by a path such
-  as `node_modules/.bin/jest`
+- `jest`, `tsc`, `eslint`, `vitest` and `playwright`
 - `gradle` and `gradlew` with `build` or `test`, and `mvn clean`, `install`,
   `test` and `package`
 - `pip install` and `pip3 install`, `cargo build` and `cargo test`, `go build`
   and `go test`, and `make`
 
-The tool name has to start the command, start a line of a multi-line command,
-or follow `;`, `&` or `|`. So `cd app && pnpm test` is trimmed, while anything
-in front of the tool name stops the match: `npx jest`, `./gradlew build`,
-`CI=1 npm test`, `time npm test` and `sudo make install` run untrimmed. So do
-`pnpm run build` and a bare `yarn`.
+A script name such as `test:unit` counts as its `test` subcommand.
+
+The command is split into statements at `;`, `&&`, `||`, `|`, `&`, new lines,
+parentheses and braces, and each statement is judged on its own. Text inside
+quotes is never split and never read as a tool, so `git commit -m "fix; make
+it work"` is left alone.
+
+Within a statement, these are skipped to find the tool:
+
+- env settings such as `CI=1` or `NODE_ENV=test`
+- the launchers `npx`, `bunx`, `pnpm exec`, `pnpm dlx` and `yarn dlx`, with
+  their options
+- a path, so `./gradlew build` and `node_modules/.bin/jest` count, and a
+  Windows `.cmd`, `.exe`, `.bat` or `.ps1` ending
+
+So `cd app && CI=1 npx jest` is trimmed. `time npm test` and `sudo make
+install` are not, since `time` and `sudo` are not skipped.
 
 What survives:
 
@@ -97,15 +109,23 @@ is left alone, so that is how you get every line.
 
 ## What is left alone
 
-A command is run as it was when any of these appears anywhere in it:
+A statement that never finishes leaves the whole command alone, because
+trimming waits for the command to end:
 
-- `--help`, `-h`, `--version`, `-v` or `--list`, because the output is the answer
-- `--watch`, or the word `dev`, `serve` or `start`, for commands that never finish
-- `>` followed by anything, for output already going to a file
+- a `dev`, `serve` or `start` script or subcommand, such as `npm run dev`,
+  `pnpm start` or `npm run dev:web`
+- any argument starting with `--watch`, such as `--watchAll`
 
-These checks look at the whole command text, so they catch more than they aim
-at: `go test -v`, `npm install --save-dev`, a path such as `~/dev/app`, and
-`2>&1` all leave the command untrimmed.
+So `pnpm build && pnpm start` runs untrimmed. A folder named `dev` after `cd`,
+`pushd` or `Set-Location` is a folder, not a server.
+
+A noisy statement is not trimmed when:
+
+- it has `--help`, `-h`, `--version` or `--list` as an argument, or `-v` as its
+  only argument, because the output is the answer. `go test -v` is still
+  trimmed, since `-v` means verbose there.
+- it sends its output to a file with `>`, `>>`, `1>` or `&>`. `2>&1` and
+  `2> errors.log` keep the output on screen, so they are trimmed.
 
 Every command is also left alone if the filter script is missing.
 
@@ -181,7 +201,8 @@ Details that matter in both:
 - **The filter is checked before rewriting.** If it is missing, the command
   runs as it was.
 
-Adding a build tool is one line in the `NOISY` list in `hooks/trim-command.mjs`.
+Adding a build tool is one entry in the `NOISY_TOOLS` map in
+`hooks/classify-command.mjs`, which pairs each tool with its noisy subcommands.
 The thresholds are at the top of `hooks/trim-output.mjs`:
 
 | Constant | Default | Meaning |
@@ -198,6 +219,7 @@ The thresholds are at the top of `hooks/trim-output.mjs`:
 | `.claude-plugin/marketplace.json` | lets `/plugin marketplace add` find the plugin |
 | `hooks/hooks.json` | registers the two hooks, each skipped when Node.js is missing |
 | `hooks/trim-command.mjs` | rewrites noisy commands |
+| `hooks/classify-command.mjs` | decides whether a command gets trimmed |
 | `hooks/trim-output.mjs` | filters the output |
 | `hooks/shell-quote.mjs` | quotes arguments for the Bash rewrite |
 | `hooks/require-subagent-model.mjs` | turns back a subagent launch with no model |
@@ -215,7 +237,7 @@ a real Windows PowerShell where those are installed.
 
 | Area | Covers |
 | --- | --- |
-| Command matching | what gets wrapped, and what is deliberately left alone |
+| Command matching | a table of commands and whether each is trimmed: statements, quotes, skipped prefixes, exemptions and redirects |
 | Rewrite shape | exit-status handling, working-directory preservation, a missing filter, multi-line capture, no shell expansion on Bash, and that neither shell's syntax leaks into the other |
 | Hook protocol | the JSON contract with Claude Code, including malformed input |
 | Filter behavior | what survives and what is dropped, reading and removing a capture file, ANSI codes, carriage-return overwrites, and output the console codepage cannot encode |
