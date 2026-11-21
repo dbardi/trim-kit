@@ -1,6 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { rewriteBash, shellQuote } from '../hooks/bash-rewrite.mjs';
 import { toPosix } from '../hooks/posix-path.mjs';
 import { BASH_CAPTURE, FILTER, bashIsAvailable, runBash } from './helpers/shells.mjs';
@@ -52,7 +54,17 @@ describe('commands the Bash rewrite cannot wrap safely are left as they are', ()
     assert.equal(rewrite("trap 'echo bye' EXIT; make"), undefined);
   });
 
-  for (const character of ['"', '$', '`']) {
+  test('a command that runs exec, which replaces the shell before the trap can run', () => {
+    assert.equal(rewrite('cd app && exec make'), undefined);
+  });
+
+  for (const command of ['make; echo trap', 'pnpm run trap-test', 'git log --grep=exec && make']) {
+    test(`the words trap and exec elsewhere still get wrapped: ${command}`, () => {
+      assert.notEqual(rewrite(command), undefined);
+    });
+  }
+
+  for (const character of ['"', '$', '`', "'"]) {
     test(`a filter path containing ${character}, which the trap's double quotes cannot hold`, () => {
       assert.equal(rewriteBash('make', `/opt/odd${character}name/trim-output.mjs`), undefined);
     });
@@ -69,6 +81,21 @@ describe('the Bash rewrite keeps Bash behavior', { skip: !bashIsAvailable && 'ne
     const rewritten = rewrite('echo fine');
     runBash(rewritten);
     assert.equal(existsSync(captureFileOf(rewritten)), false);
+  });
+
+  for (const command of ['f() { echo from inside; exit 6; }; f', 'set -e; g() { echo from inside; false; }; g']) {
+    test(`output still shows when a function ends the shell: ${command}`, () => {
+      assert.ok(runBash(rewrite(command)).stdout.includes('from inside'));
+    });
+  }
+
+  test('a filter path with a space still runs', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'trim kit '));
+    const filter = join(directory, 'trim-output.mjs');
+    copyFileSync(FILTER, filter);
+    const run = runBash(rewriteBash('seq 1 100', filter));
+    rmSync(directory, { recursive: true });
+    assert.ok(run.stdout.includes('[trim-output: 75 of 100 lines hidden;'));
   });
 
   describe('a command that calls exit itself', () => {

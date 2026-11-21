@@ -64,12 +64,6 @@ describe('the PowerShell rewrite keeps PowerShell behavior', { skip: !powershell
     assert.equal(run.status, 0);
   });
 
-  test('a trailing comment does not swallow the closing brace', () => {
-    const run = runPowerShell(rewrite('Write-Output fine # note to self'));
-    assert.equal(run.status, 0);
-    assert.ok(run.stdout.includes('fine'));
-  });
-
   test('a comment on the last line of a multi-line command does not swallow the closing brace', () => {
     const run = runPowerShell(rewrite('Write-Output fine\n# last line'));
     assert.ok(run.stdout.includes('fine'));

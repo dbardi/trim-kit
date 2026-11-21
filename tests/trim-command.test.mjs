@@ -70,6 +70,12 @@ describe('the hook protocol', () => {
     assert.ok(hookSpecificOutput.updatedInput.command.includes('Out-String'));
   });
 
+  test('a wrapped Bash command emits the Bash rewrite', () => {
+    const { updatedInput } = runHook(payload({ command: 'pnpm test', timeout: 600000 }, 'Bash')).output.hookSpecificOutput;
+    assert.match(updatedInput.command, BASH_CAPTURE);
+    assert.equal(updatedInput.timeout, 600000);
+  });
+
   test('other tool input fields survive the rewrite', () => {
     const { updatedInput } = runHook(payload({ command: 'pnpm test', description: 'run tests', timeout: 600000 })).output.hookSpecificOutput;
     assert.equal(updatedInput.description, 'run tests');

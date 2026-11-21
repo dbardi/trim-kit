@@ -13,6 +13,8 @@ const SHELLS = [
     succeeding: 'echo fine',
     failingWithOutput: 'echo broken; false',
     failingWithThree: 'echo broken; (exit 3)',
+    stderrOnly: 'echo oops >&2',
+    trailingComment: 'echo fine # note to self',
     hundredLines: 'seq 1 100',
   },
   {
@@ -23,6 +25,8 @@ const SHELLS = [
     succeeding: 'Write-Output fine',
     failingWithOutput: 'cmd /c "echo broken & exit 1"',
     failingWithThree: 'cmd /c "echo broken & exit 3"',
+    stderrOnly: 'cmd /c "echo oops 1>&2"',
+    trailingComment: 'Write-Output fine # note to self',
     hundredLines: '1..100 | ForEach-Object { "line $_" }',
   },
 ];
@@ -43,6 +47,16 @@ for (const shell of SHELLS) {
 
     test('a failing command keeps its exact exit code', () => {
       assert.equal(runRewritten(shell.failingWithThree).status, 3);
+    });
+
+    test('error output comes back with the rest', () => {
+      assert.ok(runRewritten(shell.stderrOnly).stdout.includes('oops'));
+    });
+
+    test('a trailing comment does not swallow the end of the wrapper', () => {
+      const run = runRewritten(shell.trailingComment);
+      assert.equal(run.status, 0);
+      assert.ok(run.stdout.includes('fine'));
     });
 
     test('long output comes back trimmed', () => {
