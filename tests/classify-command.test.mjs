@@ -68,6 +68,38 @@ verdicts('a launcher running a quiet tool is left alone', false, [
   'CI=1 git status',
 ]);
 
+verdicts('exempt words count only in their role', true, [
+  'go test -v ./...',
+  'dotnet test -v n',
+  'npm install --save-dev typescript',
+  'cd ~/dev/app && npm test',
+  'pnpm build -- --base /start/',
+  'pnpm build; pnpm --version',
+]);
+
+verdicts('a statement that never finishes leaves the whole command alone', false, [
+  'pnpm build && pnpm start',
+  'pnpm install && pnpm run serve',
+  'npm run dev:web',
+  'pnpm dev',
+  'pnpm build && vitest --watch',
+]);
+
+verdicts('redirects that keep output on screen do not exempt', true, [
+  'npm test 2>&1 | tail -50',
+  'pnpm build 2>&1',
+  'pnpm test 2> errors.log',
+  'pnpm test > test.log && pnpm lint',
+]);
+
+verdicts('output redirected to a file is left alone', false, [
+  'pnpm test >> test.log',
+  'pnpm test &> all.log',
+  'pnpm test > /dev/null',
+  'pnpm test 1> out.log',
+  'pnpm test >test.log',
+]);
+
 verdicts('quoted text is not a command', false, [
   'echo "a; npm test"',
   'git commit -m "fix; make it work"',
