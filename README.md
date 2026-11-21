@@ -83,8 +83,9 @@ What is dropped: progress bars and spinners, download chatter, blank lines,
 passing test lines such as `PASS` or `✓`, and stack frames inside
 `node_modules`. Color codes are stripped too.
 
-Output that is 60 lines or fewer once blank, progress and download lines are
-removed is kept whole, passing lines included, and gets no note. Longer output
+Output that is 60 lines or fewer once the dropped lines above, apart from
+passing lines, are removed keeps everything else, passing lines included, and
+gets no note. Longer output
 ends with a note saying how much was hidden:
 
 ```
@@ -185,7 +186,7 @@ The thresholds are at the top of `hooks/trim-output.mjs`:
 
 | Constant | Default | Meaning |
 | --- | ---: | --- |
-| `KEEP_ALL_UNDER` | 60 | below this many lines, pass everything through |
+| `KEEP_ALL_UNDER` | 60 | at or below this many lines after cleanup, pass the rest through |
 | `TAIL_LINES` | 25 | trailing lines always kept |
 | `MAX_SIGNAL` | 80 | cap on promoted error lines |
 
