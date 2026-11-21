@@ -29,10 +29,10 @@ describe('the Bash rewrite shape', () => {
     assert.ok(result.includes(`${shellQuote(toPosix(process.execPath))} ${shellQuote(toPosix(FILTER))} `));
   });
 
-  test('passes the capture file and the outcome to the filter on each side of && ||', () => {
+  test('filters and removes the capture file when the shell exits', () => {
     const capture = shellQuote(toPosix(captureFileOf(result)));
-    assert.ok(result.includes(`${capture} ok || `));
-    assert.ok(result.endsWith(`${capture} failed`));
+    assert.ok(result.startsWith(`trap "`));
+    assert.ok(result.includes(`< ${capture}; rm -f ${capture}" EXIT\n`));
   });
 
   test('each rewrite captures to its own file', () => {
