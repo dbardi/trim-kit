@@ -26,26 +26,41 @@ const LAUNCHERS = ['npx', 'bunx', 'pnpm exec', 'pnpm dlx', 'yarn dlx'].map((laun
 const ENV_SETTING = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const WINDOWS_EXTENSION = /\.(cmd|exe|bat|ps1)$/i;
 
-// Commands whose output is the point, that never finish, or that already write to a file.
-const EXEMPT = new RegExp([
-  '--help',
-  String.raw`-h\b`,
-  '--version',
-  String.raw`-v\b`,
-  '--watch', // also covers --watchAll
-  String.raw`\bdev\b`,
-  String.raw`\bserve\b`,
-  String.raw`\bstart\b`,
-  String.raw`--list\b`,
-  String.raw`>\s*\S`, // already redirecting to a file
-].join('|'), 'i');
+const ANSWER_FLAGS = new Set(['--help', '-h', '--version', '--list']);
+const VERSION_OR_VERBOSE = '-v';
+const SERVER_SCRIPT = /^(dev|serve|start)(:|$)/i;
+const WATCH_FLAG = '--watch';
+const STDOUT_TO_FILE = /^(1?>>?|&>>?)(?!&)/;
 
 const SEPARATORS = new Set([';', '&', '|', '\n', '(', ')', '{', '}']);
 const QUOTES = new Set(['"', "'"]);
 
 // True when the command runs a noisy build, install or test tool whose output is worth trimming.
 export function shouldTrim(command) {
-  return Boolean(command) && !EXEMPT.test(command) && splitStatements(command).map(toolInvocation).some(isNoisy);
+  if (!command) {
+    return false;
+  }
+  const invocations = splitStatements(command).map(toolInvocation);
+  return !invocations.some(neverFinishes) && invocations.some(isTrimmable);
+}
+
+// A server or watch mode keeps running, so wrapping it would hide its output until it exits.
+function neverFinishes([, ...args]) {
+  const script = args[0]?.toLowerCase() === 'run' ? args[1] : args[0];
+  return SERVER_SCRIPT.test(script ?? '') || args.some((arg) => arg.startsWith(WATCH_FLAG));
+}
+
+function isTrimmable(invocation) {
+  return isNoisy(invocation) && !answersItself(invocation) && !writesToFile(invocation);
+}
+
+// Help, version and list output is short and is the answer, and -v means verbose to go and dotnet unless it stands alone.
+function answersItself([, ...args]) {
+  return args.some((arg) => ANSWER_FLAGS.has(arg)) || (args.length === 1 && args[0] === VERSION_OR_VERBOSE);
+}
+
+function writesToFile(invocation) {
+  return invocation.some((word) => STDOUT_TO_FILE.test(word));
 }
 
 // The words from the tool onward, past any env settings and a launcher such as npx and its options.
