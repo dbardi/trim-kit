@@ -1,3 +1,5 @@
+import { splitStatements } from './split-statements.mjs';
+
 const ANY_SUBCOMMAND = [];
 const NO_SUBCOMMAND = '';
 
@@ -28,15 +30,12 @@ const ENV_SETTING = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const WINDOWS_EXTENSION = /\.(cmd|exe|bat|ps1)$/i;
 
 const ANSWER_FLAGS = new Set(['--help', '-h', '--version', '--list']);
-const VERSION_OR_VERBOSE = '-v';
+const LONE_VERSION_FLAG = '-v';
 const SERVER_SCRIPT = /^(dev|serve|start)(:|$)/i;
 const SCRIPT_RUNNERS = new Set(['npm', 'pnpm', 'yarn', 'bun', 'next', 'nuxt', 'vite', 'astro', 'ng', 'remix', 'wrangler']);
 const SERVER_WITH_NO_SUBCOMMAND = 'vite';
 const WATCH_FLAG = '--watch';
 const STDOUT_TO_FILE = /^(1?>>?|&>>?|\*>>?)(?!&)/;
-
-const SEPARATORS = new Set([';', '&', '|', '\n', '(', ')', '{', '}']);
-const QUOTES = new Set(['"', "'"]);
 
 // True when the command runs a noisy build, install or test tool whose output is worth trimming.
 export function shouldTrim(command) {
@@ -66,7 +65,7 @@ function isTrimmable(invocation) {
 
 // Help, version and list output is short and is the answer, and -v means verbose to go and dotnet unless it stands alone.
 function answersItself([, ...args]) {
-  return args.some((arg) => ANSWER_FLAGS.has(arg)) || (args.length === 1 && args[0] === VERSION_OR_VERBOSE);
+  return args.some((arg) => ANSWER_FLAGS.has(arg)) || (args.length === 1 && args[0] === LONE_VERSION_FLAG);
 }
 
 function writesToFile(invocation) {
@@ -105,48 +104,4 @@ function toolName(token) {
 function isSubcommand(token = '', noisy) {
   const name = token.toLowerCase();
   return name === noisy || name.startsWith(`${noisy}:`);
-}
-
-// Splits on shell separators outside quotes and returns each statement as its list of words.
-function splitStatements(command) {
-  const splitter = { statements: [[]], word: undefined, quote: undefined };
-  [...command].forEach((character, index) => readCharacter(splitter, character, command, index));
-  endWord(splitter);
-  return splitter.statements.filter((words) => words.length > 0);
-}
-
-function readCharacter(splitter, character, command, index) {
-  if (splitter.quote) {
-    readQuoted(splitter, character);
-  } else if (QUOTES.has(character)) {
-    splitter.quote = character;
-    splitter.word ??= '';
-  } else if (SEPARATORS.has(character) && !isRedirectAmpersand(command, index)) {
-    endWord(splitter);
-    splitter.statements.push([]);
-  } else if (/\s/.test(character)) {
-    endWord(splitter);
-  } else {
-    splitter.word = (splitter.word ?? '') + character;
-  }
-}
-
-function readQuoted(splitter, character) {
-  if (character === splitter.quote) {
-    splitter.quote = undefined;
-  } else {
-    splitter.word += character;
-  }
-}
-
-// The & in 2>&1, >&2 and &> belongs to a redirect, not a statement separator.
-function isRedirectAmpersand(command, index) {
-  return command[index] === '&' && (command[index - 1] === '>' || command[index + 1] === '>');
-}
-
-function endWord(splitter) {
-  if (splitter.word !== undefined) {
-    splitter.statements.at(-1).push(splitter.word);
-    splitter.word = undefined;
-  }
 }

@@ -220,6 +220,7 @@ The thresholds are at the top of `hooks/trim-output.mjs`:
 | `hooks/hooks.json` | registers the two hooks, each skipped when Node.js is missing |
 | `hooks/trim-command.mjs` | rewrites noisy commands |
 | `hooks/classify-command.mjs` | decides whether a command gets trimmed |
+| `hooks/split-statements.mjs` | splits a command into statements outside quotes |
 | `hooks/trim-output.mjs` | filters the output |
 | `hooks/shell-quote.mjs` | quotes arguments for the Bash rewrite |
 | `hooks/require-subagent-model.mjs` | turns back a subagent launch with no model |
