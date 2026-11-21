@@ -75,6 +75,9 @@ verdicts('exempt words count only in their role', true, [
   'cd ~/dev/app && npm test',
   'pnpm build -- --base /start/',
   'pnpm build; pnpm --version',
+  'cd dev && npm test',
+  'pushd start; make',
+  'Set-Location serve; dotnet build',
 ]);
 
 verdicts('a statement that never finishes leaves the whole command alone', false, [
