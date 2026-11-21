@@ -1,9 +1,6 @@
-import { test, describe, beforeEach, afterEach } from 'node:test';
+import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { trimmed } from '../hooks/trim-output.mjs';
 
@@ -232,40 +229,8 @@ describe('the command line, reading standard input', () => {
   });
 });
 
-describe('the command line, reading a capture file', () => {
-  let directory;
-  let capture;
-
-  beforeEach(() => {
-    directory = mkdtempSync(join(tmpdir(), 'trim-kit-test-'));
-    capture = join(directory, 'capture.out');
-    writeFileSync(capture, 'one\ntwo', 'utf8');
-  });
-
-  afterEach(() => rmSync(directory, { recursive: true, force: true }));
-
-  test('the output is read from the file', () => {
-    assert.equal(runFilter({ args: [capture, 'ok'] }).stdout, 'one\ntwo\n');
-  });
-
-  test('the file is removed once read', () => {
-    runFilter({ args: [capture, 'ok'] });
-    assert.equal(existsSync(capture), false);
-  });
-
-  test('a command that succeeded exits cleanly', () => {
-    assert.equal(runFilter({ args: [capture, 'ok'] }).status, 0);
-  });
-
-  test('a command that failed is reported as a failure', () => {
-    assert.equal(runFilter({ args: [capture, 'failed'] }).status, 1);
-  });
-
-  test('a failed command still shows its output', () => {
-    assert.equal(runFilter({ args: [capture, 'failed'] }).stdout, 'one\ntwo\n');
-  });
-
-  test('a missing capture file is reported as a failure', () => {
-    assert.equal(runFilter({ args: [join(directory, 'absent.out'), 'ok'] }).status, 1);
-  });
+test('arguments are ignored, so the filter only ever reads standard input', () => {
+  const { stdout, status } = runFilter({ args: ['/no/such/capture.out', 'failed'], stdin: 'one' });
+  assert.equal(stdout, 'one\n');
+  assert.equal(status, 0);
 });
