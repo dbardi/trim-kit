@@ -22,7 +22,8 @@ const NOISY_TOOLS = new Map([
   ['make', ANY_SUBCOMMAND],
 ]);
 
-const RUNNABLE_FROM_A_PATH = new Set(['jest', 'tsc', 'eslint', 'vitest', 'playwright']);
+const LAUNCHERS = ['npx', 'bunx', 'pnpm exec', 'pnpm dlx', 'yarn dlx'].map((launcher) => launcher.split(' '));
+const ENV_SETTING = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const WINDOWS_EXTENSION = /\.(cmd|exe|bat|ps1)$/i;
 
 // Commands whose output is the point, that never finish, or that already write to a file.
@@ -44,10 +45,26 @@ const QUOTES = new Set(['"', "'"]);
 
 // True when the command runs a noisy build, install or test tool whose output is worth trimming.
 export function shouldTrim(command) {
-  return Boolean(command) && !EXEMPT.test(command) && splitStatements(command).some(isNoisy);
+  return Boolean(command) && !EXEMPT.test(command) && splitStatements(command).map(toolInvocation).some(isNoisy);
 }
 
-function isNoisy([tool, subcommand]) {
+// The words from the tool onward, past any env settings and a launcher such as npx and its options.
+function toolInvocation(words) {
+  const afterSettings = words.slice(countWhile(words, (word) => ENV_SETTING.test(word)));
+  const launcher = LAUNCHERS.find((parts) => parts.every((part, index) => afterSettings[index]?.toLowerCase() === part));
+  if (!launcher) {
+    return afterSettings;
+  }
+  const afterLauncher = afterSettings.slice(launcher.length);
+  return afterLauncher.slice(countWhile(afterLauncher, (word) => word.startsWith('-')));
+}
+
+function countWhile(words, predicate) {
+  const index = words.findIndex((word) => !predicate(word));
+  return index === -1 ? words.length : index;
+}
+
+function isNoisy([tool = '', subcommand]) {
   const subcommands = NOISY_TOOLS.get(toolName(tool));
   if (!subcommands) {
     return false;
@@ -56,9 +73,7 @@ function isNoisy([tool, subcommand]) {
 }
 
 function toolName(token) {
-  const name = token.toLowerCase().replace(WINDOWS_EXTENSION, '');
-  const base = name.split(/[/\\]/).at(-1);
-  return base === name || RUNNABLE_FROM_A_PATH.has(base) ? base : undefined;
+  return token.toLowerCase().replace(WINDOWS_EXTENSION, '').split(/[/\\]/).at(-1);
 }
 
 // A script name such as "test:unit" counts as the "test" subcommand.
