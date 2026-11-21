@@ -28,8 +28,8 @@ describe('the Bash rewrite shape', () => {
 
   test('filters and removes the capture file when the shell exits', () => {
     const capture = shellQuote(toPosix(captureFileOf(result)));
-    assert.ok(result.startsWith(`trap "`));
-    assert.ok(result.includes(`< ${capture}; rm -f ${capture}" EXIT\n`));
+    assert.ok(result.startsWith('exec 8>&1 9>&2\ntrap "'));
+    assert.ok(result.includes(`< ${capture} >&8 2>&9; rm -f ${capture}" EXIT\n`));
   });
 
   test('each rewrite captures to its own file', () => {
