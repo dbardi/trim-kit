@@ -225,7 +225,9 @@ The thresholds are at the top of `hooks/trim-output.mjs`:
 | `hooks/classify-command.mjs` | decides whether a command gets trimmed |
 | `hooks/split-statements.mjs` | splits a command into statements outside quotes |
 | `hooks/trim-output.mjs` | filters the output |
-| `hooks/shell-quote.mjs` | quotes arguments for the Bash rewrite |
+| `hooks/bash-rewrite.mjs` | wraps a command for Bash |
+| `hooks/powershell-rewrite.mjs` | wraps a command for PowerShell |
+| `hooks/posix-path.mjs` | turns Windows paths into forward-slash paths for both shells |
 | `hooks/require-subagent-model.mjs` | turns back a subagent launch with no model |
 | `agents/repo-search.md` | the `repo-search` agent |
 | `output-styles/clear-concise-actionable.md` | the output style |
