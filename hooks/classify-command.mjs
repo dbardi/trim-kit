@@ -1,10 +1,11 @@
 const ANY_SUBCOMMAND = [];
+const NO_SUBCOMMAND = '';
 
 // Each tool with the subcommands that make it noisy; an empty list means every invocation is noisy.
 const NOISY_TOOLS = new Map([
-  ['pnpm', ['install', 'i', 'add', 'update', 'build', 'test', 'lint', 'typecheck']],
+  ['pnpm', ['install', 'i', 'add', 'update', 'build', 'test', 'lint', 'typecheck', 'run']],
   ['npm', ['install', 'ci', 'test', 'run', 'rebuild']],
-  ['yarn', ['install', 'add', 'build', 'test', 'lint']],
+  ['yarn', [NO_SUBCOMMAND, 'install', 'add', 'build', 'test', 'lint', 'run']],
   ['dotnet', ['build', 'test', 'restore', 'publish', 'pack']],
   ['msbuild', ANY_SUBCOMMAND],
   ['jest', ANY_SUBCOMMAND],
