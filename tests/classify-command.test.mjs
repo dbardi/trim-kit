@@ -86,6 +86,16 @@ verdicts('exempt words count only in their role', true, [
   'cd dev && npm test',
   'pushd start; make',
   'Set-Location serve; dotnet build',
+  'echo start; pnpm test',
+  'ls serve && make',
+  'git checkout dev && pnpm build',
+]);
+
+verdicts('a framework server after a build leaves the whole command alone', false, [
+  'pnpm build && next dev',
+  'pnpm build && ng serve',
+  'pnpm build && vite',
+  'pnpm build && bun run dev',
 ]);
 
 verdicts('a statement that never finishes leaves the whole command alone', false, [
@@ -109,6 +119,8 @@ verdicts('output redirected to a file is left alone', false, [
   'pnpm test > /dev/null',
   'pnpm test 1> out.log',
   'pnpm test >test.log',
+  'pnpm test *> all.log',
+  'pnpm test *>> all.log',
 ]);
 
 verdicts('quoted text is not a command', false, [
