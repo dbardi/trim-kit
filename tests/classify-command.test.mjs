@@ -19,7 +19,7 @@ verdicts('quiet commands are left alone', false, [
 ]);
 
 verdicts('commands whose output is the answer are left alone', false, [
-  'dotnet build --version', 'jest --help', 'tsc -v', 'playwright test --list',
+  'dotnet build --version', 'jest --help', 'tsc -v', 'playwright test --list', 'pnpm build -h',
 ]);
 
 verdicts('watch modes and servers are left alone', false, [
@@ -121,6 +121,24 @@ verdicts('output redirected to a file is left alone', false, [
   'pnpm test >test.log',
   'pnpm test *> all.log',
   'pnpm test *>> all.log',
+]);
+
+verdicts('every listed tool and subcommand is trimmed', true, [
+  'pnpm i', 'pnpm add react', 'pnpm update', 'pnpm lint', 'pnpm typecheck', 'npm run build', 'npm install',
+  'npm test', 'npm rebuild', 'yarn add react', 'yarn lint', 'yarn install', 'yarn test', 'dotnet restore',
+  'dotnet publish', 'dotnet pack', 'pip3 install requests', 'gradle test', 'mvn install', 'mvn test',
+  'mvn package', 'cargo test', 'go build', '.\\jest.exe', 'tools\\make.bat',
+]);
+
+verdicts('separators and redirect ampersands split where they should', true, [
+  'cat in.txt | jest',
+  '{ pnpm test; }',
+  'npm test >&2',
+]);
+
+verdicts('a file redirect after 2>&1 still writes to a file', false, [
+  'pnpm test 2>&1 > out.log',
+  'pnpm test &>> all.log',
 ]);
 
 verdicts('quoted text is not a command', false, [
