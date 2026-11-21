@@ -156,9 +156,10 @@ How the rewrite works, so you can change it with confidence. The hook returns a
 new command through `hookSpecificOutput.updatedInput`. On Bash:
 
 ```bash
+trap "<node> <filter> < <capture>; rm -f <capture>" EXIT
 {
 <your command>
-} > <capture> 2>&1 && <node> <filter> <capture> ok || <node> <filter> <capture> failed
+} > <capture> 2>&1
 ```
 
 `<capture>` is a file in the system temp directory with a fresh name for every
@@ -181,24 +182,27 @@ Details that matter in both:
 
 - **The command runs to completion before the filter starts.** PowerShell has
   no `set -o pipefail`, so capturing first is what lets the outcome come from
-  the command rather than the filter. On Bash only success or failure carries
-  over: the rewrite exits 0 when the command succeeded and 1 when it failed,
-  whatever code the command returned.
+  the command rather than the filter.
+- **Both shells exit with the command's own exit code.** On Bash the filter
+  runs from the EXIT trap, and a trap leaves the shell's exit status as it was.
+  On PowerShell, when no native command ran, it exits 1 if the command raised an
+  error, and 0 otherwise.
 - **The command sits on its own lines** inside the group, so a trailing `#`
   comment cannot swallow the closing brace. The group runs in the current shell,
   which keeps a `cd`, and Claude Code's Bash tool carries the working directory
-  between calls. A command that calls `exit` itself ends the shell before the
-  filter sees its output.
-- **PowerShell passes UTF-8 to the filter.** Windows PowerShell 5.1 encodes
-  what it pipes to a program as ASCII, which turns cross marks into `?`.
-- **PowerShell exits with the command's native exit code.** When no native
-  command ran, it exits 1 if the command raised an error, and 0 otherwise.
+  between calls.
+- **On Bash, a command that calls `exit` still shows its output**, because the
+  trap runs whenever the shell ends. The trap also deletes the capture file.
 - **The Bash rewrite asks the shell to expand nothing.** Claude Code asks
   before running a command it cannot analyze, and `$(mktemp)` or `$?` is exactly
-  that. The hook names the capture file, the filter learns the outcome from
-  which side of `&& ||` runs it, and the filter deletes the file and exits 1 on
-  `failed`.
-- **The filter is called as a plain command**, so an allow rule can match it.
+  that. The trap body sits in double quotes, so the hook leaves a command
+  unwrapped when the node, filter or capture path holds `"`, `$` or a backtick.
+- **A Bash command that sets its own `trap` is left unwrapped**, since Bash
+  keeps one EXIT trap and the command's would replace the filter.
+- **PowerShell passes UTF-8 to the filter.** Windows PowerShell 5.1 encodes
+  what it pipes to a program as ASCII, which turns cross marks into `?`.
+- **The filter reads only standard input** and writes the trimmed output.
+  Each shell's rewrite owns capture, cleanup and exit status.
 - **The interpreter is the Node.js that is running the hook**, as an absolute
   path, and the filter path is resolved beside the hook.
 - **The filter is checked before rewriting.** If it is missing, the command
@@ -244,8 +248,8 @@ a real Windows PowerShell where those are installed.
 | Area | Covers |
 | --- | --- |
 | Command matching | a table of commands and whether each is trimmed: statements, quotes, skipped prefixes, exemptions and redirects |
-| Rewrite shape | exit-status handling, working-directory preservation, a missing filter, multi-line capture, no shell expansion on Bash, and that neither shell's syntax leaks into the other |
+| Shell rewrites | one behavior suite run in each installed shell (success, failure output, exact exit codes, trimmed long output), plus each shell's own cases: a `cd` carrying over, an `exit` inside the command, capture-file cleanup, commands Bash declines, no shell expansion on Bash, and that neither shell's syntax leaks into the other |
 | Hook protocol | the JSON contract with Claude Code, including malformed input |
-| Filter behavior | what survives and what is dropped, reading and removing a capture file, ANSI codes, carriage-return overwrites, and output the console codepage cannot encode |
+| Filter behavior | what survives and what is dropped, reading only standard input, ANSI codes, carriage-return overwrites, and output the console codepage cannot encode |
 | Model check | which launches are turned back, the rubric in the reason, and the fork exemption |
 | Plugin layout | the manifest, marketplace entry, hook registrations, agent and output style |
