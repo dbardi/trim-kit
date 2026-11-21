@@ -45,4 +45,12 @@ verdicts('a noisy statement is found anywhere in the command', true, [
   'pnpm install && pnpm test',
   'Set-Location C:/repo\n.\\node_modules\\.bin\\jest.cmd',
   "$env:CI = '1'\npnpm test",
+  '(cd apps/web && pnpm build)',
+  '& "C:/tools/jest.cmd"',
+]);
+
+verdicts('quoted text is not a command', false, [
+  'echo "a; npm test"',
+  'git commit -m "fix; make it work"',
+  "echo 'done' | grep 'pnpm build'",
 ]);
