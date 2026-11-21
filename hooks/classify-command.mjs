@@ -30,9 +30,10 @@ const WINDOWS_EXTENSION = /\.(cmd|exe|bat|ps1)$/i;
 const ANSWER_FLAGS = new Set(['--help', '-h', '--version', '--list']);
 const VERSION_OR_VERBOSE = '-v';
 const SERVER_SCRIPT = /^(dev|serve|start)(:|$)/i;
+const SCRIPT_RUNNERS = new Set(['npm', 'pnpm', 'yarn', 'bun', 'next', 'nuxt', 'vite', 'astro', 'ng', 'remix', 'wrangler']);
+const SERVER_WITH_NO_SUBCOMMAND = 'vite';
 const WATCH_FLAG = '--watch';
-const CHANGES_FOLDER = new Set(['cd', 'pushd', 'set-location', 'sl', 'chdir']);
-const STDOUT_TO_FILE = /^(1?>>?|&>>?)(?!&)/;
+const STDOUT_TO_FILE = /^(1?>>?|&>>?|\*>>?)(?!&)/;
 
 const SEPARATORS = new Set([';', '&', '|', '\n', '(', ')', '{', '}']);
 const QUOTES = new Set(['"', "'"]);
@@ -48,11 +49,15 @@ export function shouldTrim(command) {
 
 // A server or watch mode keeps running, so wrapping it would hide its output until it exits.
 function neverFinishes([tool = '', ...args]) {
-  if (CHANGES_FOLDER.has(tool.toLowerCase())) {
+  return runsServer(toolName(tool), args) || args.some((arg) => arg.startsWith(WATCH_FLAG));
+}
+
+function runsServer(tool, args) {
+  if (!SCRIPT_RUNNERS.has(tool)) {
     return false;
   }
   const script = args[0]?.toLowerCase() === 'run' ? args[1] : args[0];
-  return SERVER_SCRIPT.test(script ?? '') || args.some((arg) => arg.startsWith(WATCH_FLAG));
+  return script === undefined ? tool === SERVER_WITH_NO_SUBCOMMAND : SERVER_SCRIPT.test(script);
 }
 
 function isTrimmable(invocation) {
