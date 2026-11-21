@@ -53,26 +53,40 @@ without this step.
 
 ## What gets trimmed
 
-Package managers, build tools and test runners: `npm`, `pnpm` and `yarn`
-install, build, test and lint, `dotnet build`, `test`, `restore`, `publish`
-and `pack`, `msbuild`, `jest`, `tsc`, `eslint`, `vitest`, `playwright`,
-`gradle`, `mvn`, `pip install`, `cargo`, `go build` and `go test`, and `make`.
+Package managers, build tools and test runners:
 
-It works when the command comes first, after `;`, `&&` or `|`, or on a later
-line of a multi-line command.
+- `pnpm install`, `i`, `add`, `update`, `build`, `test`, `lint` and `typecheck`
+- `npm install`, `ci`, `test`, `run` and `rebuild`
+- `yarn install`, `add`, `build`, `test` and `lint`
+- `dotnet build`, `test`, `restore`, `publish` and `pack`, and `msbuild`
+- `jest`, `tsc`, `eslint`, `vitest` and `playwright`, by name or by a path such
+  as `node_modules/.bin/jest`
+- `gradle` and `gradlew` with `build` or `test`, and `mvn clean`, `install`,
+  `test` and `package`
+- `pip install` and `pip3 install`, `cargo build` and `cargo test`, `go build`
+  and `go test`, and `make`
+
+The tool name has to start the command, start a line of a multi-line command,
+or follow `;`, `&` or `|`. So `cd app && pnpm test` is trimmed, while anything
+in front of the tool name stops the match: `npx jest`, `./gradlew build`,
+`CI=1 npm test`, `time npm test` and `sudo make install` run untrimmed. So do
+`pnpm run build` and a bare `yarn`.
 
 What survives:
 
-- error, failure, exception and warning lines
+- error, failure, exception and warning lines, up to 80 of them
 - TypeScript errors such as `TS2322`, and cross marks in test output
 - `Tests:`, `Suites:` and `Snapshots:` summaries
-- the last 25 lines, always
+- the last 25 lines that are left once the dropped lines below are gone
 
 What is dropped: progress bars and spinners, download chatter, blank lines,
-passing test lines, and stack frames inside `node_modules`. Short output, up to
-60 lines, is never touched.
+passing test lines such as `PASS` or `✓`, and stack frames inside
+`node_modules`. Color codes are stripped too.
 
-Every trim ends with a note, so nothing disappears silently:
+Output that is 60 lines or fewer once the dropped lines above, apart from
+passing lines, are removed keeps everything else, passing lines included, and
+gets no note. Longer output
+ends with a note saying how much was hidden:
 
 ```
 [trim-output: 113 of 138 lines hidden; re-run with its output redirected to a file for full output]
@@ -83,10 +97,17 @@ is left alone, so that is how you get every line.
 
 ## What is left alone
 
-- `--help`, `--version`, `-v` and `--list`, because the output is the answer
-- `--watch`, `dev`, `serve` and `start`, which never finish
-- any command that already redirects its output to a file
-- every command, if the filter script is missing
+A command is run as it was when any of these appears anywhere in it:
+
+- `--help`, `-h`, `--version`, `-v` or `--list`, because the output is the answer
+- `--watch`, or the word `dev`, `serve` or `start`, for commands that never finish
+- `>` followed by anything, for output already going to a file
+
+These checks look at the whole command text, so they catch more than they aim
+at: `go test -v`, `npm install --save-dev`, a path such as `~/dev/app`, and
+`2>&1` all leave the command untrimmed.
+
+Every command is also left alone if the filter script is missing.
 
 ## Uninstall
 
@@ -136,8 +157,10 @@ exit $(if ($null -ne $c) { $c } elseif ($f) { 1 } else { 0 })
 Details that matter in both:
 
 - **The command runs to completion before the filter starts.** PowerShell has
-  no `set -o pipefail`, so the capture keeps the command's own exit code
-  instead of the filter's.
+  no `set -o pipefail`, so capturing first is what lets the outcome come from
+  the command rather than the filter. On Bash only success or failure carries
+  over: the rewrite exits 0 when the command succeeded and 1 when it failed,
+  whatever code the command returned.
 - **The command sits on its own lines** inside the group, so a trailing `#`
   comment cannot swallow the closing brace. The group runs in the current shell,
   which keeps a `cd`, and Claude Code's Bash tool carries the working directory
@@ -163,7 +186,7 @@ The thresholds are at the top of `hooks/trim-output.mjs`:
 
 | Constant | Default | Meaning |
 | --- | ---: | --- |
-| `KEEP_ALL_UNDER` | 60 | below this many lines, pass everything through |
+| `KEEP_ALL_UNDER` | 60 | at or below this many lines after cleanup, pass the rest through |
 | `TAIL_LINES` | 25 | trailing lines always kept |
 | `MAX_SIGNAL` | 80 | cap on promoted error lines |
 
