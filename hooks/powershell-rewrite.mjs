@@ -1,8 +1,7 @@
 import { toPosix } from './posix-path.mjs';
 
-// PowerShell has no pipefail, so it captures first, keeps $LASTEXITCODE and re-raises it after the filter.
-// With no native exit code it exits 1 when the command raised an error. Only Windows PowerShell 5.1 syntax is used,
-// and the raw output shows when the filter file is missing.
+// Captures first and re-raises $LASTEXITCODE after the filter, or 1 when no native command ran and one raised an error.
+// It keeps to Windows PowerShell 5.1 syntax and shows the raw output when the filter file is missing.
 export function rewritePowerShell(command, filterPath) {
   const interpreter = `"${toPosix(process.execPath)}"`;
   const filter = `"${toPosix(filterPath)}"`;

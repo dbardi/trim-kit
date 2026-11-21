@@ -156,7 +156,8 @@ How the rewrite works, so you can change it with confidence. The hook returns a
 new command through `hookSpecificOutput.updatedInput`. On Bash:
 
 ```bash
-trap "<node> <filter> < <capture>; rm -f <capture>" EXIT
+exec 8>&1 9>&2
+trap "<node> <filter> < <capture> >&8 2>&9; rm -f <capture>" EXIT
 {
 <your command>
 } > <capture> 2>&1
@@ -181,10 +182,9 @@ exit $(if ($null -ne $c) { $c } elseif ($f) { 1 } else { 0 })
 Details that matter in both:
 
 - **The command runs to completion before the filter starts.** PowerShell has
-  no `set -o pipefail`, so capturing first is what lets the outcome come from
-  the command rather than the filter.
+  no `set -o pipefail`, so the outcome comes from a captured run of the command.
 - **Both shells exit with the command's own exit code.** On Bash the filter
-  runs from the EXIT trap, and a trap leaves the shell's exit status as it was.
+  runs from the EXIT trap, and an EXIT trap keeps the shell's exit status.
   On PowerShell, when no native command ran, it exits 1 if the command raised an
   error, and 0 otherwise.
 - **The command sits on its own lines** inside the group, so a trailing `#`
@@ -192,13 +192,19 @@ Details that matter in both:
   which keeps a `cd`, and Claude Code's Bash tool carries the working directory
   between calls.
 - **On Bash, a command that calls `exit` still shows its output**, because the
-  trap runs whenever the shell ends. The trap also deletes the capture file.
+  trap runs whenever the shell ends. `exec 8>&1 9>&2` keeps the screen on
+  descriptors 8 and 9, so the filter writes there even when a function exits
+  while the capture redirect is still open. The trap also deletes the capture
+  file.
 - **The Bash rewrite asks the shell to expand nothing.** Claude Code asks
   before running a command it cannot analyze, and `$(mktemp)` or `$?` is exactly
   that. The trap body sits in double quotes, so the hook leaves a command
   unwrapped when the node, filter or capture path holds `"`, `$` or a backtick.
-- **A Bash command that sets its own `trap` is left unwrapped**, since Bash
-  keeps one EXIT trap and the command's would replace the filter.
+- **A Bash statement that starts with `trap` or `exec` leaves the command
+  unwrapped.** Bash keeps one EXIT trap, so the command's would replace the
+  filter, and `exec` replaces the shell before the trap can run. The same words
+  elsewhere, such as `echo trap`, are fine. A node or filter path with a single
+  quote leaves the command unwrapped too, since its quoting adds a `"`.
 - **PowerShell passes UTF-8 to the filter.** Windows PowerShell 5.1 encodes
   what it pipes to a program as ASCII, which turns cross marks into `?`.
 - **The filter reads only standard input** and writes the trimmed output.
