@@ -30,6 +30,7 @@ const ANSWER_FLAGS = new Set(['--help', '-h', '--version', '--list']);
 const VERSION_OR_VERBOSE = '-v';
 const SERVER_SCRIPT = /^(dev|serve|start)(:|$)/i;
 const WATCH_FLAG = '--watch';
+const CHANGES_FOLDER = new Set(['cd', 'pushd', 'set-location', 'sl', 'chdir']);
 const STDOUT_TO_FILE = /^(1?>>?|&>>?)(?!&)/;
 
 const SEPARATORS = new Set([';', '&', '|', '\n', '(', ')', '{', '}']);
@@ -45,7 +46,10 @@ export function shouldTrim(command) {
 }
 
 // A server or watch mode keeps running, so wrapping it would hide its output until it exits.
-function neverFinishes([, ...args]) {
+function neverFinishes([tool = '', ...args]) {
+  if (CHANGES_FOLDER.has(tool.toLowerCase())) {
+    return false;
+  }
   const script = args[0]?.toLowerCase() === 'run' ? args[1] : args[0];
   return SERVER_SCRIPT.test(script ?? '') || args.some((arg) => arg.startsWith(WATCH_FLAG));
 }
