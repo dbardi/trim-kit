@@ -52,6 +52,18 @@ describe('the Bash rewrite shape', () => {
   });
 });
 
+describe('commands the Bash rewrite cannot wrap safely are left as they are', () => {
+  test('a command that sets its own trap, which would replace the filter', () => {
+    assert.equal(rewrite("trap 'echo bye' EXIT; make"), undefined);
+  });
+
+  for (const character of ['"', '$', '`']) {
+    test(`a filter path containing ${character}, which the trap's double quotes cannot hold`, () => {
+      assert.equal(rewriteBash('make', `/opt/odd${character}name/trim-output.mjs`), undefined);
+    });
+  }
+});
+
 const bashIsAvailable = spawnSync('bash', ['--version']).status === 0;
 
 describe('the Bash rewrite keeps Bash behavior', { skip: !bashIsAvailable && 'needs bash' }, () => {

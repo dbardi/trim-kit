@@ -31,6 +31,10 @@ describe('only the shell tools are this hook\'s business', () => {
   }
 });
 
+test('a command the shell rewrite declines is untouched', () => {
+  assert.equal(decide("trap 'echo bye' EXIT; make", 'Bash'), undefined);
+});
+
 test('a missing filter leaves the command untouched', () => {
   assert.equal(decide('pnpm test', 'Bash', '/nonexistent/trim-output.mjs'), undefined);
 });
