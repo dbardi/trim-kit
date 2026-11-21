@@ -112,19 +112,22 @@ is left alone, so that is how you get every line.
 A statement that never finishes leaves the whole command alone, because
 trimming waits for the command to end:
 
-- a `dev`, `serve` or `start` script or subcommand, such as `npm run dev`,
-  `pnpm start` or `npm run dev:web`
+- a `dev`, `serve` or `start` script or subcommand of `npm`, `pnpm`, `yarn`,
+  `bun`, `next`, `nuxt`, `vite`, `astro`, `ng`, `remix` or `wrangler`, such as
+  `npm run dev`, `pnpm start`, `npm run dev:web` or `ng serve`
+- `vite` on its own
 - any argument starting with `--watch`, such as `--watchAll`
 
-So `pnpm build && pnpm start` runs untrimmed. A folder named `dev` after `cd`,
-`pushd` or `Set-Location` is a folder, not a server.
+So `pnpm build && pnpm start` runs untrimmed, while `echo start; pnpm test` and
+`cd dev && npm test` are trimmed.
 
 A noisy statement is not trimmed when:
 
 - it has `--help`, `-h`, `--version` or `--list` as an argument, or `-v` as its
   only argument, because the output is the answer. `go test -v` is still
   trimmed, since `-v` means verbose there.
-- it sends its output to a file with `>`, `>>`, `1>` or `&>`. `2>&1` and
+- it sends its output to a file with `>`, `>>`, `1>`, `&>` or PowerShell's
+  `*>`. `2>&1` and
   `2> errors.log` keep the output on screen, so they are trimmed.
 
 Every command is also left alone if the filter script is missing.
