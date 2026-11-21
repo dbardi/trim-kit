@@ -35,6 +35,14 @@ verdicts('package managers and compilers are trimmed', true, [
   'msbuild', 'mvn clean', 'cargo build', 'go test', 'make', 'pip install requests', 'gradlew build',
 ]);
 
+verdicts('package scripts and a bare yarn install are trimmed', true, [
+  'pnpm run build', 'yarn run test', 'yarn', 'cd app && yarn',
+]);
+
+verdicts('a package script that runs a server is left alone', false, [
+  'pnpm run dev', 'yarn run start', 'yarn start',
+]);
+
 verdicts('test runners are trimmed however they are invoked', true, [
   'jest', 'tsc --noEmit', 'eslint .', 'vitest', 'playwright test', 'node_modules/.bin/jest',
   ['.', 'node_modules', '.bin', 'jest.cmd'].join(BACKSLASH),
