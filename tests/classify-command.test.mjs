@@ -49,6 +49,25 @@ verdicts('a noisy statement is found anywhere in the command', true, [
   '& "C:/tools/jest.cmd"',
 ]);
 
+verdicts('env settings, launchers and paths in front of the tool are seen through', true, [
+  'CI=1 npm test',
+  'NODE_ENV=test FORCE_COLOR=0 pnpm test',
+  'npx jest',
+  'npx -y tsc --noEmit',
+  'pnpm exec vitest run',
+  'pnpm dlx playwright test',
+  'yarn dlx eslint .',
+  'bunx jest',
+  './gradlew build',
+  'bin/make',
+  'cd app && CI=1 npx jest',
+]);
+
+verdicts('a launcher running a quiet tool is left alone', false, [
+  'npx prettier --check .',
+  'CI=1 git status',
+]);
+
 verdicts('quoted text is not a command', false, [
   'echo "a; npm test"',
   'git commit -m "fix; make it work"',
