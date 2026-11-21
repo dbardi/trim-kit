@@ -1,22 +1,13 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { rewriteBash } from '../hooks/bash-rewrite.mjs';
 import { rewritePowerShell } from '../hooks/powershell-rewrite.mjs';
-
-const FILTER = fileURLToPath(new URL('../hooks/trim-output.mjs', import.meta.url));
-
-const runBash = (script) => spawnSync('bash', ['-c', script], { encoding: 'utf8' });
-const runPowerShell = (script) => {
-  const encoded = Buffer.from(script, 'utf16le').toString('base64');
-  return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], { encoding: 'utf8' });
-};
+import { FILTER, bashIsAvailable, powershellIsAvailable, runBash, runPowerShell } from './helpers/shells.mjs';
 
 const SHELLS = [
   {
     name: 'Bash',
-    available: spawnSync('bash', ['--version']).status === 0,
+    available: bashIsAvailable,
     rewrite: rewriteBash,
     run: runBash,
     succeeding: 'echo fine',
@@ -26,7 +17,7 @@ const SHELLS = [
   },
   {
     name: 'PowerShell',
-    available: spawnSync('powershell.exe', ['-NoProfile', '-Command', 'exit 0']).status === 0,
+    available: powershellIsAvailable,
     rewrite: rewritePowerShell,
     run: runPowerShell,
     succeeding: 'Write-Output fine',

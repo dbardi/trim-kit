@@ -1,16 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { rewriteBash, shellQuote } from '../hooks/bash-rewrite.mjs';
+import { toPosix } from '../hooks/posix-path.mjs';
+import { BASH_CAPTURE, FILTER, bashIsAvailable, runBash } from './helpers/shells.mjs';
 
-const BACKSLASH = String.fromCharCode(92);
-const FILTER = fileURLToPath(new URL('../hooks/trim-output.mjs', import.meta.url));
-const CAPTURE = /\}\s*>\s*('[^']*'|\S+)\s*2>&1/;
-
-const toPosix = (path) => path.replaceAll(BACKSLASH, '/');
-const captureFileOf = (rewrite) => CAPTURE.exec(rewrite)[1].replaceAll("'", '');
+const captureFileOf = (rewrite) => BASH_CAPTURE.exec(rewrite)[1].replaceAll("'", '');
 const rewrite = (command) => rewriteBash(command, FILTER);
 
 describe('the Bash rewrite shape', () => {
@@ -64,11 +59,7 @@ describe('commands the Bash rewrite cannot wrap safely are left as they are', ()
   }
 });
 
-const bashIsAvailable = spawnSync('bash', ['--version']).status === 0;
-
 describe('the Bash rewrite keeps Bash behavior', { skip: !bashIsAvailable && 'needs bash' }, () => {
-  const runBash = (script) => spawnSync('bash', ['-c', script], { encoding: 'utf8' });
-
   test('a cd inside the command carries to what follows', () => {
     const run = runBash(`${rewrite('cd /')}\npwd`);
     assert.equal(run.stdout.trim().split('\n').at(-1), '/');

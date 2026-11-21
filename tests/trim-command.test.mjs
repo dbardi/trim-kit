@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { decide } from '../hooks/trim-command.mjs';
+import { BASH_CAPTURE } from './helpers/shells.mjs';
 
 const POWERSHELL = 'PowerShell';
-const BASH_CAPTURE = /\}\s*>\s*('[^']*'|\S+)\s*2>&1/;
 
 const wrapped = (command, tool = POWERSHELL) => decide(command, tool);
 

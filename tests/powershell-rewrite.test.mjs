@@ -1,14 +1,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { toPosix } from '../hooks/posix-path.mjs';
 import { rewritePowerShell } from '../hooks/powershell-rewrite.mjs';
+import { BASH_CAPTURE, FILTER, powershellIsAvailable, runPowerShell } from './helpers/shells.mjs';
 
 const BACKSLASH = String.fromCharCode(92);
-const FILTER = fileURLToPath(new URL('../hooks/trim-output.mjs', import.meta.url));
-const BASH_CAPTURE = /\}\s*>\s*('[^']*'|\S+)\s*2>&1/;
-
-const toPosix = (path) => path.replaceAll(BACKSLASH, '/');
 const rewrite = (command) => rewritePowerShell(command, FILTER);
 
 describe('the PowerShell rewrite shape', () => {
@@ -52,18 +48,7 @@ describe('the PowerShell rewrite shape', () => {
   });
 });
 
-const powershellIsAvailable = spawnSync('powershell.exe', ['-NoProfile', '-Command', 'exit 0']).status === 0;
-
 describe('the PowerShell rewrite keeps PowerShell behavior', { skip: !powershellIsAvailable && 'needs powershell.exe' }, () => {
-  const runPowerShell = (script) => {
-    const encoded = Buffer.from(script, 'utf16le').toString('base64');
-    return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], { encoding: 'utf8' });
-  };
-
-  test('a failing native command keeps its exit code', () => {
-    assert.equal(runPowerShell(rewrite('cmd /c "exit 3"')).status, 3);
-  });
-
   test('an unknown command fails when no native command ran', () => {
     const run = runPowerShell(rewrite('No-Such-Command-Anywhere'));
     assert.notEqual(run.status, 0);
