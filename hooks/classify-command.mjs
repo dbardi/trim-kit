@@ -1,0 +1,107 @@
+import { splitStatements } from './split-statements.mjs';
+
+const ANY_SUBCOMMAND = [];
+const NO_SUBCOMMAND = '';
+
+// Each tool with the subcommands that make it noisy; an empty list means every invocation is noisy.
+const NOISY_TOOLS = new Map([
+  ['pnpm', ['install', 'i', 'add', 'update', 'build', 'test', 'lint', 'typecheck', 'run']],
+  ['npm', ['install', 'ci', 'test', 'run', 'rebuild']],
+  ['yarn', [NO_SUBCOMMAND, 'install', 'add', 'build', 'test', 'lint', 'run']],
+  ['dotnet', ['build', 'test', 'restore', 'publish', 'pack']],
+  ['msbuild', ANY_SUBCOMMAND],
+  ['jest', ANY_SUBCOMMAND],
+  ['tsc', ANY_SUBCOMMAND],
+  ['eslint', ANY_SUBCOMMAND],
+  ['vitest', ANY_SUBCOMMAND],
+  ['playwright', ANY_SUBCOMMAND],
+  ['gradle', ['build', 'test']],
+  ['gradlew', ['build', 'test']],
+  ['mvn', ['clean', 'install', 'test', 'package']],
+  ['pip', ['install']],
+  ['pip3', ['install']],
+  ['cargo', ['build', 'test']],
+  ['go', ['build', 'test']],
+  ['make', ANY_SUBCOMMAND],
+]);
+
+const LAUNCHERS = ['npx', 'bunx', 'pnpm exec', 'pnpm dlx', 'yarn dlx'].map((launcher) => launcher.split(' '));
+const ENV_SETTING = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const WINDOWS_EXTENSION = /\.(cmd|exe|bat|ps1)$/i;
+
+const ANSWER_FLAGS = new Set(['--help', '-h', '--version', '--list']);
+const LONE_VERSION_FLAG = '-v';
+const SERVER_SCRIPT = /^(dev|serve|start)(:|$)/i;
+const SCRIPT_RUNNERS = new Set(['npm', 'pnpm', 'yarn', 'bun', 'next', 'nuxt', 'vite', 'astro', 'ng', 'remix', 'wrangler']);
+const SERVER_WITH_NO_SUBCOMMAND = 'vite';
+const WATCH_FLAG = '--watch';
+const STDOUT_TO_FILE = /^(1?>>?|&>>?|\*>>?)(?!&)/;
+
+// True when the command runs a noisy build, install or test tool whose output is worth trimming.
+export function shouldTrim(command) {
+  if (!command) {
+    return false;
+  }
+  const invocations = splitStatements(command).map(toolInvocation);
+  return !invocations.some(neverFinishes) && invocations.some(isTrimmable);
+}
+
+// A server or watch mode keeps running, so wrapping it would hide its output until it exits.
+function neverFinishes([tool = '', ...args]) {
+  return runsServer(toolName(tool), args) || args.some((arg) => arg.startsWith(WATCH_FLAG));
+}
+
+function runsServer(tool, args) {
+  if (!SCRIPT_RUNNERS.has(tool)) {
+    return false;
+  }
+  const script = args[0]?.toLowerCase() === 'run' ? args[1] : args[0];
+  return script === undefined ? tool === SERVER_WITH_NO_SUBCOMMAND : SERVER_SCRIPT.test(script);
+}
+
+function isTrimmable(invocation) {
+  return isNoisy(invocation) && !answersItself(invocation) && !writesToFile(invocation);
+}
+
+// Help, version and list output is short and is the answer, and -v means verbose to go and dotnet unless it stands alone.
+function answersItself([, ...args]) {
+  return args.some((arg) => ANSWER_FLAGS.has(arg)) || (args.length === 1 && args[0] === LONE_VERSION_FLAG);
+}
+
+function writesToFile(invocation) {
+  return invocation.some((word) => STDOUT_TO_FILE.test(word));
+}
+
+// The words from the tool onward, past any env settings and a launcher such as npx and its options.
+function toolInvocation(words) {
+  const afterSettings = words.slice(countWhile(words, (word) => ENV_SETTING.test(word)));
+  const launcher = LAUNCHERS.find((parts) => parts.every((part, index) => afterSettings[index]?.toLowerCase() === part));
+  if (!launcher) {
+    return afterSettings;
+  }
+  const afterLauncher = afterSettings.slice(launcher.length);
+  return afterLauncher.slice(countWhile(afterLauncher, (word) => word.startsWith('-')));
+}
+
+function countWhile(words, predicate) {
+  const index = words.findIndex((word) => !predicate(word));
+  return index === -1 ? words.length : index;
+}
+
+function isNoisy([tool = '', subcommand]) {
+  const subcommands = NOISY_TOOLS.get(toolName(tool));
+  if (!subcommands) {
+    return false;
+  }
+  return subcommands === ANY_SUBCOMMAND || subcommands.some((noisy) => isSubcommand(subcommand, noisy));
+}
+
+function toolName(token) {
+  return token.toLowerCase().replace(WINDOWS_EXTENSION, '').split(/[/\\]/).at(-1);
+}
+
+// A script name such as "test:unit" counts as the "test" subcommand.
+function isSubcommand(token = '', noisy) {
+  const name = token.toLowerCase();
+  return name === noisy || name.startsWith(`${noisy}:`);
+}
