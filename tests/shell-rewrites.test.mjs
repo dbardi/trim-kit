@@ -21,6 +21,7 @@ const SHELLS = [
     run: runBash,
     succeeding: 'echo fine',
     failingWithOutput: 'echo broken; false',
+    failingWithThree: 'echo broken; (exit 3)',
     hundredLines: 'seq 1 100',
   },
   {
@@ -29,7 +30,8 @@ const SHELLS = [
     rewrite: rewritePowerShell,
     run: runPowerShell,
     succeeding: 'Write-Output fine',
-    failingWithOutput: 'cmd /c "echo broken & exit 3"',
+    failingWithOutput: 'cmd /c "echo broken & exit 1"',
+    failingWithThree: 'cmd /c "echo broken & exit 3"',
     hundredLines: '1..100 | ForEach-Object { "line $_" }',
   },
 ];
@@ -46,6 +48,10 @@ for (const shell of SHELLS) {
       const run = runRewritten(shell.failingWithOutput);
       assert.notEqual(run.status, 0);
       assert.ok(run.stdout.includes('broken'));
+    });
+
+    test('a failing command keeps its exact exit code', () => {
+      assert.equal(runRewritten(shell.failingWithThree).status, 3);
     });
 
     test('long output comes back trimmed', () => {

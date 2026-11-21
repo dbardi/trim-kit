@@ -67,6 +67,23 @@ describe('the Bash rewrite keeps Bash behavior', { skip: !bashIsAvailable && 'ne
     runBash(rewritten);
     assert.equal(existsSync(captureFileOf(rewritten)), false);
   });
+
+  describe('a command that calls exit itself', () => {
+    const rewritten = rewrite('echo before leaving; exit 3');
+    const run = runBash(rewritten);
+
+    test('keeps its exit code', () => {
+      assert.equal(run.status, 3);
+    });
+
+    test('still shows its output', () => {
+      assert.ok(run.stdout.includes('before leaving'));
+    });
+
+    test('leaves no capture file behind', () => {
+      assert.equal(existsSync(captureFileOf(rewritten)), false);
+    });
+  });
 });
 
 describe('shell quoting', () => {
